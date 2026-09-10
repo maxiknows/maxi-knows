@@ -1,0 +1,131 @@
+basePath: /
+definitions:
+  main.ErrorResponse:
+    properties:
+      message:
+        type: string
+      statusCode:
+        type: integer
+    type: object
+  main.RegisterResponse:
+    properties:
+      message:
+        type: string
+      statusCode:
+        type: integer
+    type: object
+  main.SearchResponse:
+    properties:
+      data:
+        items: {}
+        type: array
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Search and user registration API for the WhoKnows project.
+  title: WhoKnows API
+  version: "1.0"
+paths:
+  /:
+    get:
+      description: Returns the WhoKnows landing page
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: WhoKnows
+          schema:
+            type: string
+      summary: Home page
+      tags:
+      - pages
+  /api/register:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Creates a new user account from form data
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Email address
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.RegisterResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /api/search:
+    get:
+      description: Searches for matches by query, optionally filtered by language
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Language filter
+        in: query
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.SearchResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Search
+      tags:
+      - search
+  /login:
+    get:
+      description: Returns the login form page
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: Login
+          schema:
+            type: string
+      summary: Login page
+      tags:
+      - pages
+  /register:
+    get:
+      description: Returns the registration form page
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: Register
+          schema:
+            type: string
+      summary: Registration page
+      tags:
+      - pages
+swagger: "2.0"
