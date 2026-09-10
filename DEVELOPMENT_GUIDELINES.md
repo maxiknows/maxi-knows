@@ -24,6 +24,14 @@ Example: git commit -m "Test: xxxxxx"
 
 -------------------------
 
+5. Refactor
+Commits that restructure existing code or project organization
+without changing its functionality.
+
+Example: git commit -m "refactor: restructure project directories"
+
+-------------------------
+
 ## Branch Names
 
 1. Always lowercase.
