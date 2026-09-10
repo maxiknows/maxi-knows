@@ -6,7 +6,9 @@ import (
 )
 
 func main(){
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request){
+	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request){
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "WhoKnows")
 	})
 
