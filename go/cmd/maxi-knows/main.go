@@ -57,6 +57,29 @@ func main(){
 		})
 	})
 
+
+	http.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request){
+		r.ParseForm()
+
+		
+		if !r.Form.Has("username") || !r.Form.Has("email") || !r.Form.Has("password"){
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"statusCode": 200,
+			"message": "Registered",
+		})
+
+	})
+
 	fmt.Println("Server running on http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
 }
