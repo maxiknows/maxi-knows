@@ -8,25 +8,23 @@ Example: git commit -m "feat: xxxxxx"
 
 2. Fix Commits that fix an API or UI bug of a preceded feat commit
 
-Example: git commit -m "Fix: xxxxxx"
+Example: git commit -m "fix: xxxxxx"
 
 -------------------------
 
 3. Style Commits that address code style (e.g., white-space, formatting, missing semi-colons) and do not affect application behavior
 
-Example: git commit -m "Style: xxxxxx"
+Example: git commit -m "style: xxxxxx"
 
 -------------------------
 
 4. Test Commits that add missing tests or correct existing ones
 
-Example: git commit -m "Test: xxxxxx"
+Example: git commit -m "test: xxxxxx"
 
 -------------------------
 
-5. Refactor
-Commits that restructure existing code or project organization
-without changing its functionality.
+5. Refactor Commits that restructure existing code or project organization without changing its functionality.
 
 Example: git commit -m "refactor: restructure project directories"
 
