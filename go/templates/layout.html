@@ -1,0 +1,80 @@
+<!--
+    Go template rewrite of the original Flask/Jinja layout.
+    Changes made in this file:
+
+    - The layout is now defined as a named Go template using:
+      { { define "layout" } }
+
+    - Flask's url_for() function has been removed.
+      Routes and static files are now referenced directly, for example:
+      /login, /register, /about and /static/style.css.
+
+    - The Flask/Jinja global object g.user is no longer available.
+      Instead, information about the logged-in user will be passed
+      from the Go backend to the template as data.
+      The username is therefore accessed through .Username.
+
+    - Jinja conditionals such as:
+      {% if ... %}, {% else %} and {% endif %}
+      have been replaced with Go template conditionals:
+      { { if ... } }, { { else } } and { { end } }.
+
+    - Flask's get_flashed_messages() is no longer available.
+      Flash messages will instead be supplied by the Go backend
+      through .Flashes and rendered using { { range } }.
+
+    - The Jinja body block:
+      {% block body %}{% endblock %}
+      has been replaced with:
+      { { template "body" . } }
+      This allows page-specific templates such as about.html
+      to define the body content while still using this shared layout.
+-->
+
+
+{{ define "layout" }}
+
+<!doctype html>
+<title>¿Who Knows?</title>
+
+<link rel="stylesheet" type="text/css" href="/static/style.css">
+
+
+<div class="page">
+    <div class="navigation">
+        <nav>
+
+            <h1><a id="nav-logo" href="/">¿Who Knows?</a></h1>
+
+            {{ if .Username }}
+            <a id="nav-logout" href="/api/logout">Log out [{{ .Username }}]</a>
+            {{ else }}
+            <a id="nav-login" href="/login">Log in</a>
+            <a id="nav-register" href="/register">Register</a>
+            {{ end }}
+
+        </nav>
+    </div>
+
+
+    {{ if .Flashes }}
+    <ul class="flashes">
+        {{ range .Flashes }}
+        <li>{{ . }}</li>
+        {{ end }}
+    </ul>
+    {{ end }}
+
+
+    <div class="body">
+        {{ template "body" . }}
+    </div>
+
+
+    <div class="footer">
+        <span>¿Who Knows? &copy; 2009</span>
+        <a href="/about">About</a>
+    </div>
+</div>
+
+{{ end }}
