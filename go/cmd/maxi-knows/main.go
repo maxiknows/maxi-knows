@@ -15,24 +15,45 @@ type PageData struct {
 	Flashes  []string
 }
 
-// aboutHandler handles GET requests to /about.
-func aboutHandler(w http.ResponseWriter, r *http.Request) {
+// renderTemplate handles the shared template rendering logic.
+// It loads layout.html together with the page-specific template,
+// then renders the named "layout" template and sends it to the browser.
+func renderTemplate(w http.ResponseWriter, page string, data PageData) {
 	tmpl, err := template.ParseFiles(
 		"templates/layout.html",
-		"templates/about.html",
+		"templates/"+page,
 	)
 
+	// Stop and return a 500 error if the templates cannot be loaded.
 	if err != nil {
 		http.Error(w, "Could not load template", http.StatusInternalServerError)
 		return
 	}
 
-	data := PageData{}
-
+	// Render the named "layout" template and send the generated HTML
+	// to the browser through the ResponseWriter.
 	err = tmpl.ExecuteTemplate(w, "layout", data)
 
+	// Return a 500 error if the template could not be rendered.
 	if err != nil {
 		http.Error(w, "Could not render template", http.StatusInternalServerError)
+	}
+}
+
+// pageHandler creates a HTTP handler for pages that only need
+// to render a template using the shared layout.
+//
+// The page parameter decides which page-specific template is rendered.
+// For example, pageHandler("about.html") renders about.html together
+// with layout.html.
+func pageHandler(page string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// Create the data object that is passed to the templates.
+		// Username and Flashes are empty for now.
+		data := PageData{}
+
+		renderTemplate(w, page, data)
 	}
 }
 
@@ -57,9 +78,13 @@ func main() {
 		fmt.Fprintln(w, "Login")
 	})
 
-	http.HandleFunc("GET /about", aboutHandler)
+	// Render the about page using the shared pageHandler.
+	http.HandleFunc("GET /about", pageHandler("about.html"))
 
-	// Static files
+	// Serve files from the static folder.
+	// For example:
+	// /static/style.css -> static/style.css
+	// /static/monkgroup.png -> static/monkgroup.png
 	http.Handle(
 		"/static/",
 		http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
@@ -146,6 +171,7 @@ func main() {
 		})
 	})
 
+	// Start the web server on port 8080.
 	log.Println("Server running on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
