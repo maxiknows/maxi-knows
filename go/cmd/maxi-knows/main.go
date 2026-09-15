@@ -36,6 +36,9 @@ func renderTemplate(w http.ResponseWriter, page string, data PageData) {
 
 	// Return a 500 error if the template could not be rendered.
 	if err != nil {
+
+		log.Printf("Could not render template: %v", err)
+
 		http.Error(w, "Could not render template", http.StatusInternalServerError)
 	}
 }
@@ -72,11 +75,7 @@ func main() {
 		fmt.Fprintln(w, "Register")
 	})
 
-	http.HandleFunc("GET /login", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Login")
-	})
+	http.HandleFunc("GET /login", pageHandler("login.html")) 
 
 	// Render the about page using the shared pageHandler.
 	http.HandleFunc("GET /about", pageHandler("about.html"))
