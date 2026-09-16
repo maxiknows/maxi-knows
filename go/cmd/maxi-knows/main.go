@@ -65,17 +65,23 @@ func pageHandler(page string) http.HandlerFunc {
 
 func main() {
 
+
 	// HTML routes
+
+    // GET /
 	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "WhoKnows")
 	})
 
+    // GET /REGISTER
     http.HandleFunc("GET /register", pageHandler("register.html"))
 
+    // GET /LOGIN
 	http.HandleFunc("GET /login", pageHandler("login.html")) 
 
+    // GET /ABOUT
 	// Render the about page using the shared pageHandler.
 	http.HandleFunc("GET /about", pageHandler("about.html"))
 
@@ -88,7 +94,8 @@ func main() {
 		http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
 	)
 
-	// API routes
+	// ============================ API routes ============================
+    // GET API/SEARCH
 	http.HandleFunc("GET /api/search", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("q")
 		language := r.URL.Query().Get("language")
@@ -116,6 +123,8 @@ func main() {
 		})
 	})
 
+
+    // POST /API/REGISTER
 	http.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -139,6 +148,7 @@ func main() {
 		})
 	})
 
+    // POST /API/LOGIN
 	http.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -159,6 +169,7 @@ func main() {
 		})
 	})
 
+    // GET /API/LOGOUT
 	http.HandleFunc("GET /api/logout", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
