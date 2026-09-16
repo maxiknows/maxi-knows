@@ -8,12 +8,14 @@ import (
 )
 
 func main() {
-	db, err := sql.Open("sqlite", "whoknows.db")
+	db, err := sql.Open("sqlite", "../data/whoknows.db")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
+	// WARNING: Running this file resets the users table.
+	// All existing registered users will be deleted.
 	schema := `
 	DROP TABLE IF EXISTS users;
 
