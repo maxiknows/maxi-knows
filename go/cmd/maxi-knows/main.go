@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -11,11 +10,20 @@ import (
 // PageData contains the data that can be passed from the Go backend
 // to the HTML templates.
 type PageData struct {
-	Username     string
-	Flashes      []string
-	Error        string
-	FormUsername string
-	FormEmail    string
+	Username      string
+	Flashes       []string
+	Error         string
+	FormUsername  string
+	FormEmail     string
+	Query         string
+	SearchResults []SearchResult
+}
+
+// SearchResult represents one result shown on the search page.
+type SearchResult struct {
+	URL         string
+	Title       string
+	Description string
 }
 
 // renderTemplate handles the shared template rendering logic.
@@ -63,25 +71,31 @@ func pageHandler(page string) http.HandlerFunc {
 	}
 }
 
-func main() {
+// searchPageHandler handles GET requests to the search page.
+// It reads the search query from the URL and passes it to the template.
+func searchPageHandler(w http.ResponseWriter, r *http.Request) {
+	data := PageData{
+		Query:         r.URL.Query().Get("q"),
+		SearchResults: []SearchResult{},
+	}
 
+	renderTemplate(w, "search.html", data)
+}
+
+func main() {
 
 	// HTML routes
 
-    // GET /
-	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "WhoKnows")
-	})
+	// GET /SEARCH
+	http.HandleFunc("GET /{$}", searchPageHandler)
 
-    // GET /REGISTER
-    http.HandleFunc("GET /register", pageHandler("register.html"))
+	// GET /REGISTER
+	http.HandleFunc("GET /register", pageHandler("register.html"))
 
-    // GET /LOGIN
-	http.HandleFunc("GET /login", pageHandler("login.html")) 
+	// GET /LOGIN
+	http.HandleFunc("GET /login", pageHandler("login.html"))
 
-    // GET /ABOUT
+	// GET /ABOUT
 	// Render the about page using the shared pageHandler.
 	http.HandleFunc("GET /about", pageHandler("about.html"))
 
@@ -95,7 +109,7 @@ func main() {
 	)
 
 	// ============================ API routes ============================
-    // GET API/SEARCH
+	// GET API/SEARCH
 	http.HandleFunc("GET /api/search", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("q")
 		language := r.URL.Query().Get("language")
@@ -123,8 +137,7 @@ func main() {
 		})
 	})
 
-
-    // POST /API/REGISTER
+	// POST /API/REGISTER
 	http.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -148,7 +161,7 @@ func main() {
 		})
 	})
 
-    // POST /API/LOGIN
+	// POST /API/LOGIN
 	http.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -169,7 +182,7 @@ func main() {
 		})
 	})
 
-    // GET /API/LOGOUT
+	// GET /API/LOGOUT
 	http.HandleFunc("GET /api/logout", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
