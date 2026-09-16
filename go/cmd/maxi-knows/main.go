@@ -4,10 +4,10 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"fmt"
 
 	_ "modernc.org/sqlite"
 )
@@ -15,11 +15,20 @@ import (
 // PageData contains the data that can be passed from the Go backend
 // to the HTML templates.
 type PageData struct {
-	Username     string
-	Flashes      []string
-	Error        string
-	FormUsername string
-	FormEmail    string
+	Username      string
+	Flashes       []string
+	Error         string
+	FormUsername  string
+	FormEmail     string
+	Query         string
+	SearchResults []SearchResult
+}
+
+// SearchResult represents one result shown on the search page.
+type SearchResult struct {
+	URL         string
+	Title       string
+	Description string
 }
 
 // renderTemplate handles the shared template rendering logic.
@@ -67,6 +76,17 @@ func pageHandler(page string) http.HandlerFunc {
 	}
 }
 
+// searchPageHandler handles GET requests to the search page.
+// It reads the search query from the URL and passes it to the template.
+func searchPageHandler(w http.ResponseWriter, r *http.Request) {
+	data := PageData{
+		Query:         r.URL.Query().Get("q"),
+		SearchResults: []SearchResult{},
+	}
+
+	renderTemplate(w, "search.html", data)
+}
+
 func main() {
 	db, err := sql.Open("sqlite", "../data/whoknows.db")
 	if err != nil {
@@ -76,12 +96,8 @@ func main() {
 
 	// HTML routes
 
-	// GET /
-	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "WhoKnows")
-	})
+	// GET /SEARCH
+	http.HandleFunc("GET /{$}", searchPageHandler)
 
 	// GET /REGISTER
 	http.HandleFunc("GET /register", pageHandler("register.html"))

@@ -1,0 +1,66 @@
+<!--
+    Go template rewrite of the original Flask/Jinja search page.
+    Changes made in this file:
+
+    - The Jinja extends and title blocks were removed.
+      The shared layout is handled through Go's template system.
+
+    - The Jinja body block:
+      {% block body %} ... {% endblock %}
+      has been replaced with the Go body template:
+      { { define "body" } } ... { { end } }
+
+    - Flask's request.args value for the search query has been replaced
+      with .Query, which is supplied by the Go backend.
+
+    - The Jinja loop over search_results has been replaced with
+      Go's range functionality using .SearchResults.
+
+    - Search result fields are accessed through the Go struct fields
+      .URL, .Title and .Description.
+
+    - The JavaScript search functionality has been kept unchanged.
+-->
+
+{{ define "body" }}
+
+<div>
+  <input id="search-input" placeholder="Search..." value="{{ .Query }}"/>
+  <button id="search-button" onclick="makeSearchRequest()">Search</button>
+</div>
+
+<div id="results">
+  {{ range .SearchResults }}
+  <div>
+      <h2><a class="search-result-title" href="{{ .URL }}">{{ .Title }}</a></h2>
+      <p class="search-result-description">{{ .Description }}</p>
+  </div>
+  {{ end }}
+</div>
+
+<script>
+  let searchInput;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    searchInput = document.getElementById("search-input");
+
+    // Focus the input field
+    searchInput.focus();
+
+    // Search when the user presses Enter
+    searchInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+          makeSearchRequest();
+        }
+    });
+  });
+
+  function makeSearchRequest() {
+    const query = searchInput.value;
+    const url = new URL(window.location.href);
+    url.searchParams.set('q', query);
+    window.location.href = url.toString();
+  }
+</script>
+
+{{ end }}
