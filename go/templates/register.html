@@ -1,0 +1,53 @@
+<!--
+    Go template rewrite of the original Flask/Jinja register page.
+    Changes made in this file:
+
+    - The Jinja extends and title blocks were removed.
+      The shared layout is handled through Go's template system.
+
+    - The Jinja body block:
+      {% block body %} ... {% endblock %}
+      has been replaced with the Go body template:
+      { { define "body" } } ... { { end } }
+
+    - The Jinja error condition has been replaced with a Go
+      template condition using .Error.
+
+    - Flask's request.form values are no longer available.
+      Username and email values are instead supplied by the Go backend
+      through .FormUsername and .FormEmail.
+
+    - The form still sends a POST request to /api/register.
+-->
+
+{{ define "body" }}
+
+<h2>Sign Up</h2>
+
+{{ if .Error }}
+<div class="error">
+    <strong>Error:</strong> {{ .Error }}
+</div>
+{{ end }}
+
+<form action="/api/register" method="POST">
+    <dl>
+        <dt>Username:
+        <dd><input type="text" name="username" size="30" value="{{ .FormUsername }}">
+
+        <dt>E-Mail:
+        <dd><input type="text" name="email" size="30" value="{{ .FormEmail }}">
+
+        <dt>Password:
+        <dd><input type="password" name="password" size="30">
+
+        <dt>Password <small>(repeat)</small>:
+        <dd><input type="password" name="password2" size="30">
+    </dl>
+
+    <div class="actions">
+        <input type="submit" value="Sign Up">
+    </div>
+</form>
+
+{{ end }}
