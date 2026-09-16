@@ -1,11 +1,15 @@
 package main
 
 import (
+	"crypto/md5"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+
+	_ "modernc.org/sqlite"
 )
 
 // PageData contains the data that can be passed from the Go backend
@@ -64,24 +68,28 @@ func pageHandler(page string) http.HandlerFunc {
 }
 
 func main() {
-
+	db, err := sql.Open("sqlite", "../data/whoknows.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
 	// HTML routes
 
-    // GET /
+	// GET /
 	http.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "WhoKnows")
 	})
 
-    // GET /REGISTER
-    http.HandleFunc("GET /register", pageHandler("register.html"))
+	// GET /REGISTER
+	http.HandleFunc("GET /register", pageHandler("register.html"))
 
-    // GET /LOGIN
-	http.HandleFunc("GET /login", pageHandler("login.html")) 
+	// GET /LOGIN
+	http.HandleFunc("GET /login", pageHandler("login.html"))
 
-    // GET /ABOUT
+	// GET /ABOUT
 	// Render the about page using the shared pageHandler.
 	http.HandleFunc("GET /about", pageHandler("about.html"))
 
@@ -95,7 +103,7 @@ func main() {
 	)
 
 	// ============================ API routes ============================
-    // GET API/SEARCH
+	// GET API/SEARCH
 	http.HandleFunc("GET /api/search", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("q")
 		language := r.URL.Query().Get("language")
@@ -123,8 +131,7 @@ func main() {
 		})
 	})
 
-
-    // POST /API/REGISTER
+	// POST /API/REGISTER
 	http.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -148,7 +155,7 @@ func main() {
 		})
 	})
 
-    // POST /API/LOGIN
+	// POST /API/LOGIN
 	http.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
@@ -157,6 +164,49 @@ func main() {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
 			json.NewEncoder(w).Encode(map[string]interface{}{})
+			return
+		}
+
+		username := r.Form.Get("username")
+		password := r.Form.Get("password")
+
+		row := db.QueryRow(
+			"SELECT id, username, password FROM users WHERE username = ?",
+			username,
+		)
+
+		var userID int
+		var storedUsername string
+		var storedPassword string
+
+		err = row.Scan(&userID, &storedUsername, &storedPassword)
+
+		if err == sql.ErrNoRows {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 401,
+				"message":    "Invalid username",
+			})
+			return
+		}
+
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+
+		if storedPassword != passwordHash {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 401,
+				"message":    "Invalid password",
+			})
 			return
 		}
 
@@ -169,7 +219,7 @@ func main() {
 		})
 	})
 
-    // GET /API/LOGOUT
+	// GET /API/LOGOUT
 	http.HandleFunc("GET /api/logout", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
