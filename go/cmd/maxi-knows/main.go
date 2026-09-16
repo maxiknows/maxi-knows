@@ -11,8 +11,11 @@ import (
 // PageData contains the data that can be passed from the Go backend
 // to the HTML templates.
 type PageData struct {
-	Username string
-	Flashes  []string
+	Username     string
+	Flashes      []string
+	Error        string
+	FormUsername string
+	FormEmail    string
 }
 
 // renderTemplate handles the shared template rendering logic.
@@ -69,11 +72,7 @@ func main() {
 		fmt.Fprintln(w, "WhoKnows")
 	})
 
-	http.HandleFunc("GET /register", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Register")
-	})
+    http.HandleFunc("GET /register", pageHandler("register.html"))
 
 	http.HandleFunc("GET /login", pageHandler("login.html")) 
 

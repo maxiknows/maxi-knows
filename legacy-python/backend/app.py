@@ -12,7 +12,7 @@ from flask import Flask, request, session, url_for, redirect, render_template, g
 # Configuration
 ################################################################################
 
-DATABASE_PATH = '../whoknows.db'
+DATABASE_PATH = '../../../data/whoknows.db'
 PER_PAGE = 30
 DEBUG = False
 SECRET_KEY = 'development key'
