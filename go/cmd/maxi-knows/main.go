@@ -10,6 +10,10 @@ import (
 	"net/http"
 	"strings"
 
+	_ "whoknows/docs"
+
+	httpSwagger "github.com/swaggo/http-swagger"
+
 	_ "modernc.org/sqlite"
 )
 
@@ -88,46 +92,20 @@ func searchPageHandler(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "search.html", data)
 }
 
-func main() {
-	db, err := sql.Open("sqlite", "../data/whoknows.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	// HTML routes
-
-	// GET /SEARCH
-	http.HandleFunc("GET /{$}", searchPageHandler)
-
-	// GET /REGISTER
-	http.HandleFunc("GET /register", pageHandler("register.html"))
-
-	// GET /LOGIN
-	http.HandleFunc("GET /login", pageHandler("login.html"))
-
-	// GET /ABOUT
-	// Render the about page using the shared pageHandler.
-	http.HandleFunc("GET /about", pageHandler("about.html"))
-
-	// Serve files from the static folder.
-	// For example:
-	// /static/style.css -> static/style.css
-	// /static/monkgroup.png -> static/monkgroup.png
-	http.Handle(
-		"/static/",
-		http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
-	)
-
-	// ============================ API routes ============================
-	// GET API/SEARCH
-	http.HandleFunc("GET /api/search", func(w http.ResponseWriter, r *http.Request) {
+// apiSearchHandler godoc
+// @Summary      Search pages
+// @Description  Search pages by query and language
+// @Tags         search
+// @Produce      json
+// @Param        q         query     string  true   "Search query"
+// @Param        language  query     string  false  "Language code" default(en)
+// @Success      200  {object}  map[string]interface{}
+// @Failure      422  {object}  map[string]interface{}
+// @Router       /search [get]
+func apiSearchHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query().Get("q")
 		language := r.URL.Query().Get("language")
-
-		// Replace with actual result from db later:
-		_ = q
-		_ = language
 
 		if !r.URL.Query().Has("q") {
 			w.Header().Set("Content-Type", "application/json")
@@ -140,16 +118,66 @@ func main() {
 			return
 		}
 
+		if language == "" {
+			language = "en"
+		}
+
+		rows, err := db.Query(
+			"SELECT url, title, description FROM pages WHERE language = ? AND content LIKE ?",
+			language, "%"+q+"%",
+		)
+
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		results := []SearchResult{}
+
+		for rows.Next() {
+			var result SearchResult
+
+			err = rows.Scan(&result.URL, &result.Title, &result.Description)
+
+			if err != nil {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+
+			results = append(results, result)
+		}
+
+		if err = rows.Err(); err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": []interface{}{},
+			"data": results,
 		})
-	})
+	}
+}
 
-	// POST /API/REGISTER
-	http.HandleFunc("POST /api/register", func(w http.ResponseWriter, r *http.Request) {
+// apiRegisterHandler godoc
+// @Summary      Register a new user
+// @Description  Creates a new user account
+// @Tags         auth
+// @Accept       x-www-form-urlencoded
+// @Produce      json
+// @Param        username   formData  string  true  "Username"
+// @Param        email      formData  string  true  "Email"
+// @Param        password   formData  string  true  "Password"
+// @Param        password2  formData  string  true  "Password confirmation"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      422  {object}  map[string]interface{}
+// @Failure      409  {object}  map[string]interface{}
+// @Router       /register [post]
+func apiRegisterHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
 		if !r.Form.Has("username") ||
@@ -220,7 +248,7 @@ func main() {
 		//check if username or email already exists in db
 		var existingUserID int
 
-		err = db.QueryRow(
+		err := db.QueryRow(
 			"SELECT id FROM users WHERE username = ? OR email = ?",
 			username, email,
 		).Scan(&existingUserID)
@@ -263,10 +291,23 @@ func main() {
 			"statusCode": 200,
 			"message":    "Registered",
 		})
-	})
+	}
+}
 
-	// POST /API/LOGIN
-	http.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
+// apiLoginHandler godoc
+// @Summary      Log in a user
+// @Description  Authenticates a user with username and password
+// @Tags         auth
+// @Accept       x-www-form-urlencoded
+// @Produce      json
+// @Param        username  formData  string  true  "Username"
+// @Param        password  formData  string  true  "Password"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      401  {object}  map[string]interface{}
+// @Failure      422  {object}  map[string]interface{}
+// @Router       /login [post]
+func apiLoginHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 
 		if !r.Form.Has("username") || !r.Form.Has("password") {
@@ -289,7 +330,7 @@ func main() {
 		var storedUsername string
 		var storedPassword string
 
-		err = row.Scan(&userID, &storedUsername, &storedPassword)
+		err := row.Scan(&userID, &storedUsername, &storedPassword)
 
 		if err == sql.ErrNoRows {
 			w.Header().Set("Content-Type", "application/json")
@@ -327,18 +368,77 @@ func main() {
 			"statusCode": 200,
 			"message":    "Logged in",
 		})
+	}
+}
+
+// apiLogoutHandler godoc
+// @Summary      Log out the current user
+// @Description  Logs the current user out
+// @Tags         auth
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}
+// @Router       /logout [get]
+func apiLogoutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"statusCode": 200,
+		"message":    "Logged out",
 	})
+}
+
+// @title           WhoKnows API
+// @version         1.0
+// @description     Search, register, login and logout API for WhoKnows.
+// @host            localhost:8080
+// @BasePath        /api
+func main() {
+	db, err := sql.Open("sqlite", "../data/whoknows.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// HTML routes
+
+	// GET /SEARCH
+	http.HandleFunc("GET /{$}", searchPageHandler)
+
+	// GET /REGISTER
+	http.HandleFunc("GET /register", pageHandler("register.html"))
+
+	// GET /LOGIN
+	http.HandleFunc("GET /login", pageHandler("login.html"))
+
+	// GET /ABOUT
+	// Render the about page using the shared pageHandler.
+	http.HandleFunc("GET /about", pageHandler("about.html"))
+
+	// Serve files from the static folder.
+	// For example:
+	// /static/style.css -> static/style.css
+	// /static/monkgroup.png -> static/monkgroup.png
+	http.Handle(
+		"/static/",
+		http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
+	)
+
+	// ============================ API routes ============================
+	// GET API/SEARCH
+	http.HandleFunc("GET /api/search", apiSearchHandler(db))
+
+	// POST /API/REGISTER
+	http.HandleFunc("POST /api/register", apiRegisterHandler(db))
+
+	// POST /API/LOGIN
+	http.HandleFunc("POST /api/login", apiLoginHandler(db))
 
 	// GET /API/LOGOUT
-	http.HandleFunc("GET /api/logout", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+	http.HandleFunc("GET /api/logout", apiLogoutHandler)
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"statusCode": 200,
-			"message":    "Logged out",
-		})
-	})
+	// Swagger UI + JSON spec
+	http.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	// Start the web server on port 8080.
 	log.Println("Server running on http://localhost:8080")
