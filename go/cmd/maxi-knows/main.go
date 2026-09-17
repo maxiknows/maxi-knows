@@ -345,13 +345,7 @@ func main() {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"statusCode": 200,
-			"message":    "Logged in",
-		})
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
 	// GET /API/LOGOUT
