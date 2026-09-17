@@ -4,10 +4,11 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"fmt"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -153,12 +154,105 @@ func main() {
 
 		if !r.Form.Has("username") ||
 			!r.Form.Has("email") ||
-			!r.Form.Has("password") {
+			!r.Form.Has("password") ||
+			!r.Form.Has("password2") {
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
 			json.NewEncoder(w).Encode(map[string]interface{}{})
+			return
+		}
+
+		username := r.Form.Get("username")
+		email := r.Form.Get("email")
+		password := r.Form.Get("password")
+		password2 := r.Form.Get("password2")
+
+		//Check if username is empty
+		if username == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 422,
+				"message":    "Username is required",
+			})
+			return
+		}
+
+		//Check if email is empty or invalid format
+		if email == "" || !strings.Contains(email, "@") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 422,
+				"message":    "Valid email is required",
+			})
+			return
+		}
+
+		//check if password is empty
+		if password == "" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 422,
+				"message":    "Password is required",
+			})
+			return
+		}
+
+		//check if passwords match
+		if password != password2 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnprocessableEntity)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 422,
+				"message":    "Passwords do not match",
+			})
+			return
+		}
+
+		//check if username or email already exists in db
+		var existingUserID int
+
+		err = db.QueryRow(
+			"SELECT id FROM users WHERE username = ? OR email = ?",
+			username, email,
+		).Scan(&existingUserID)
+
+		//If username or email already exists, error message 409 shows
+		if err == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 409,
+				"message":    "Username or email already exists",
+			})
+			return
+		}
+
+		if err != sql.ErrNoRows {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		// Hash the password using MD5
+		passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+
+		// Insert the new user into the database
+		_, err = db.Exec(
+			"INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+			username, email, passwordHash,
+		)
+
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 
