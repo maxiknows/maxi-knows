@@ -1,10 +1,15 @@
 package main
 
 import (
+	"crypto/md5"
+	"database/sql"
 	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
+	"fmt"
+
+	_ "modernc.org/sqlite"
 )
 
 // PageData contains the data that can be passed from the Go backend
@@ -83,6 +88,11 @@ func searchPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	db, err := sql.Open("sqlite", "../data/whoknows.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
 	// HTML routes
 
@@ -170,6 +180,49 @@ func main() {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 
 			json.NewEncoder(w).Encode(map[string]interface{}{})
+			return
+		}
+
+		username := r.Form.Get("username")
+		password := r.Form.Get("password")
+
+		row := db.QueryRow(
+			"SELECT id, username, password FROM users WHERE username = ?",
+			username,
+		)
+
+		var userID int
+		var storedUsername string
+		var storedPassword string
+
+		err = row.Scan(&userID, &storedUsername, &storedPassword)
+
+		if err == sql.ErrNoRows {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 401,
+				"message":    "Invalid username",
+			})
+			return
+		}
+
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+
+		if storedPassword != passwordHash {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"statusCode": 401,
+				"message":    "Invalid password",
+			})
 			return
 		}
 
