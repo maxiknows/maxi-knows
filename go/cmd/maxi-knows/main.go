@@ -125,10 +125,6 @@ func main() {
 		q := r.URL.Query().Get("q")
 		language := r.URL.Query().Get("language")
 
-		// Replace with actual result from db later:
-		_ = q
-		_ = language
-
 		if !r.URL.Query().Has("q") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -140,11 +136,46 @@ func main() {
 			return
 		}
 
+		if language == "" {
+			language = "en"
+		}
+
+		rows, err := db.Query(
+			"SELECT url, title, description FROM pages WHERE language = ? AND content LIKE ?",
+			language, "%"+q+"%",
+		)
+
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		results := []SearchResult{}
+
+		for rows.Next() {
+			var result SearchResult
+
+			err = rows.Scan(&result.URL, &result.Title, &result.Description)
+
+			if err != nil {
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+
+			results = append(results, result)
+		}
+
+		if err = rows.Err(); err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": []interface{}{},
+			"data": results,
 		})
 	})
 

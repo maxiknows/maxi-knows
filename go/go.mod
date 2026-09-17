@@ -1,4 +1,4 @@
-module whoknows
+module maxi-knows
 
 go 1.27.1
 
