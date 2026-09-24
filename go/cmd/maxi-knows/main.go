@@ -141,7 +141,7 @@ func main() {
 		}
 
 		rows, err := db.Query(
-			"SELECT url, title, description FROM pages WHERE language = ? AND content LIKE ?",
+			"SELECT url, title, content FROM pages WHERE language = ? AND content LIKE ?",
 			language, "%"+q+"%",
 		)
 
