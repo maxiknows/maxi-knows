@@ -20,47 +20,147 @@
       .URL, .Title and .Description.
 
     - The JavaScript search functionality has been kept unchanged.
+
+    - A weather widget was added under the search bar. It uses the
+      browser's geolocation API to get the visitor's coordinates, then
+      calls the backend's /api/weather proxy (Open-Meteo, cached).
 -->
 
 {{ define "body" }}
 
 <div>
-  <input id="search-input" placeholder="Search..." value="{{ .Query }}"/>
-  <button id="search-button" onclick="makeSearchRequest()">Search</button>
+    <input id="search-input" placeholder="Search..." value="{{ .Query }}"/>
+    <button id="search-button" onclick="makeSearchRequest()">Search</button>
+</div>
+
+<div id="weather-widget">
+    <div id="weather-location"></div>
+    <div id="weather-current"></div>
 </div>
 
 <div id="results">
-  {{ range .SearchResults }}
-  <div>
-      <h2><a class="search-result-title" href="{{ .URL }}">{{ .Title }}</a></h2>
-      <p class="search-result-description">{{ .Description }}</p>
-  </div>
-  {{ end }}
+    {{ range .SearchResults }}
+    <div>
+        <h2><a class="search-result-title" href="{{ .URL }}">{{ .Title }}</a></h2>
+        <p class="search-result-description">{{ .Description }}</p>
+    </div>
+    {{ end }}
 </div>
 
 <script>
-  let searchInput;
+    let searchInput;
 
-  document.addEventListener('DOMContentLoaded', () => {
-    searchInput = document.getElementById("search-input");
+    document.addEventListener('DOMContentLoaded', () => {
+        searchInput = document.getElementById("search-input");
 
-    // Focus the input field
-    searchInput.focus();
+        // Focus the input field
+        searchInput.focus();
 
-    // Search when the user presses Enter
-    searchInput.addEventListener('keypress', (event) => {
-        if (event.key === 'Enter') {
-          makeSearchRequest();
-        }
+        // Search when the user presses Enter
+        searchInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                makeSearchRequest();
+            }
+        });
+
+        loadWeather();
     });
-  });
 
-  function makeSearchRequest() {
-    const query = searchInput.value;
-    const url = new URL(window.location.href);
-    url.searchParams.set('q', query);
-    window.location.href = url.toString();
-  }
+    function makeSearchRequest() {
+        const query = searchInput.value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('q', query);
+        window.location.href = url.toString();
+    }
+
+    // WMO weather codes (used by Open-Meteo) mapped to a short label and emoji.
+    // https://open-meteo.com/en/docs#weathervariables
+    const WEATHER_CODES = {
+        0: ["Clear sky", "☀️"],
+        1: ["Mainly clear", "🌤️"],
+        2: ["Partly cloudy", "⛅"],
+        3: ["Overcast", "☁️"],
+        45: ["Fog", "🌫️"],
+        48: ["Fog", "🌫️"],
+        51: ["Light drizzle", "🌦️"],
+        53: ["Drizzle", "🌦️"],
+        55: ["Dense drizzle", "🌦️"],
+        61: ["Light rain", "🌧️"],
+        63: ["Rain", "🌧️"],
+        65: ["Heavy rain", "🌧️"],
+        71: ["Light snow", "🌨️"],
+        73: ["Snow", "🌨️"],
+        75: ["Heavy snow", "🌨️"],
+        80: ["Rain showers", "🌦️"],
+        81: ["Rain showers", "🌦️"],
+        82: ["Violent showers", "⛈️"],
+        95: ["Thunderstorm", "⛈️"],
+        96: ["Thunderstorm, hail", "⛈️"],
+        99: ["Thunderstorm, hail", "⛈️"],
+    };
+
+    function describeWeatherCode(code) {
+        return WEATHER_CODES[code] || ["Unknown", "❔"];
+    }
+
+    // Ask the browser for the visitor's location, then fetch weather for it.
+    function loadWeather() {
+        const current = document.getElementById("weather-current");
+
+        if (!navigator.geolocation) {
+            current.textContent = "Weather unavailable (no geolocation support)";
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                fetchWeather(latitude, longitude);
+                fetchLocationName(latitude, longitude);
+            },
+            () => {
+                current.textContent = "Weather unavailable (location permission denied)";
+            },
+            // Coarse, cached position is plenty for a forecast and avoids a slow GPS fix.
+            { enableHighAccuracy: false, maximumAge: 15 * 60 * 1000, timeout: 10000 }
+        );
+    }
+
+    async function fetchWeather(lat, lon) {
+        const current = document.getElementById("weather-current");
+
+        try {
+            const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+
+            if (!res.ok) {
+                current.textContent = "Weather unavailable";
+                return;
+            }
+
+            const data = await res.json();
+            const temp = Math.round(data.current.temperature_2m);
+            const [label, emoji] = describeWeatherCode(data.current.weather_code);
+
+            current.textContent = `${emoji} ${temp}°C — ${label}`;
+        } catch (err) {
+            current.textContent = "Weather unavailable";
+        }
+    }
+
+    // The place name is a nice-to-have, so on failure just leave it blank.
+    async function fetchLocationName(lat, lon) {
+        const locationEl = document.getElementById("weather-location");
+
+        try {
+            const res = await fetch(`/api/location?lat=${lat}&lon=${lon}`);
+            if (!res.ok) return;
+
+            const data = await res.json();
+            locationEl.textContent = `📍 ${data.name}`;
+        } catch (err) {
+            // Intentionally ignored.
+        }
+    }
 </script>
 
 {{ end }}
