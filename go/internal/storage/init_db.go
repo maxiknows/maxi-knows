@@ -1,21 +1,9 @@
-package main
+package storage
 
-import (
-    "database/sql"
-    "log"
+import "database/sql"
 
-    _ "modernc.org/sqlite"
-)
-
-func main() {
-    db, err := sql.Open("sqlite", "../data/whoknows.db")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    defer db.Close()
-
-    schema := `
+func InitDB(db *sql.DB) error {
+	schema := `
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL UNIQUE,
@@ -31,10 +19,6 @@ func main() {
         content TEXT NOT NULL
     );`
 
-    _, err = db.Exec(schema)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    log.Println("Database initialized successfully")
+	_, err := db.Exec(schema)
+	return err
 }
