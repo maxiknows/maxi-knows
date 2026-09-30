@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
 
@@ -491,13 +492,21 @@ func main() {
 			return
 		}
 
-		// Hash the password using MD5
-		passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+		// Hash the password using bcrypt
+		passwordHash, err := bcrypt.GenerateFromPassword(
+			[]byte(password),
+			bcrypt.DefaultCost,
+		)
+
+		if err != nil {
+			http.Error(w, "Could not hash password", http.StatusInternalServerError)
+			return
+		}
 
 		// Insert the new user into the database
 		_, err = db.Exec(
 			"INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-			username, email, passwordHash,
+			username, email, string(passwordHash),
 		)
 
 		if err != nil {
@@ -550,9 +559,52 @@ func main() {
 			return
 		}
 
-		passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+		passwordIsCorrect := false
 
-		if storedPassword != passwordHash {
+		// Check if the stored password is already a bcrypt hash
+		_, bcryptErr := bcrypt.Cost([]byte(storedPassword))
+
+		if bcryptErr == nil {
+			// New user: verify password with bcrypt
+			err = bcrypt.CompareHashAndPassword(
+				[]byte(storedPassword),
+				[]byte(password),
+			)
+
+			passwordIsCorrect = err == nil
+
+		} else {
+			// Legacy user: verify the old MD5 password
+			legacyHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+
+			passwordIsCorrect = storedPassword == legacyHash
+
+			// If the old password was correct, upgrade it to bcrypt
+			if passwordIsCorrect {
+				newHash, err := bcrypt.GenerateFromPassword(
+					[]byte(password),
+					bcrypt.DefaultCost,
+				)
+
+				if err != nil {
+					http.Error(w, "Could not hash password", http.StatusInternalServerError)
+					return
+				}
+
+				_, err = db.Exec(
+					"UPDATE users SET password = ? WHERE id = ?",
+					string(newHash),
+					userID,
+				)
+
+				if err != nil {
+					http.Error(w, "Database error", http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+
+		if !passwordIsCorrect {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 
