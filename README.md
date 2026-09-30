@@ -5,6 +5,7 @@
 **SonarQube Cloud**
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=maxiknows_maxi-knows)](https://sonarcloud.io/summary/new_code?id=maxiknows_maxi-knows)
+
 [![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=maxiknows_maxi-knows&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=maxiknows_maxi-knows)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=maxiknows_maxi-knows&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=maxiknows_maxi-knows)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=maxiknows_maxi-knows&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=maxiknows_maxi-knows)
