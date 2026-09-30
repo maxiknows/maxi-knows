@@ -1,0 +1,28 @@
+*   [33m86e712c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Merge pull request #59 from maxiknows/olga-fix-form-labels
+[31m|[m[32m\[m  
+[31m|[m * [33m0a6cf97[m Update search.html for merge
+[31m|[m *   [33mc7909e7[m Merge branch 'main' into olga-fix-form-labels
+[31m|[m [33m|[m[31m\[m  
+[31m|[m [33m|[m[31m/[m  
+[31m|[m[31m/[m[33m|[m   
+* [33m|[m [33mcda1a68[m Update README.md
+* [33m|[m [33m4df66a3[m Update README.md with qlty badge
+* [33m|[m   [33mf6d44f2[m Merge pull request #62 from maxiknows/tobi-feat-weatherapi
+[35m|[m[36m\[m [33m\[m  
+[35m|[m * [33m|[m [33mfe8aadd[m[33m ([m[1;31morigin/tobi-feat-weatherapi[m[33m, [m[1;32mtobi-feat-weatherapi[m[33m)[m added weather API+location name for search page
+[35m|[m [36m|[m * [33m61762c8[m[33m ([m[1;31morigin/olga-fix-form-labels[m[33m, [m[1;32molga-fix-form-labels[m[33m)[m fix: add labels to form inputs
+[35m|[m [36m|[m[35m/[m  
+[35m|[m[35m/[m[36m|[m   
+* [36m|[m   [33maf6ceaa[m Merge pull request #52 from maxiknows/silke-fix-api-search
+[1;31m|[m[1;32m\[m [36m\[m  
+[1;31m|[m * [36m|[m [33m6a3b10a[m Fix: api search database query
+[1;31m|[m[1;31m/[m [36m/[m  
+* [36m|[m [33m27085a2[m removed old issue template
+* [36m|[m [33m0fb56f2[m Update issue templates
+[36m|[m[36m/[m  
+*   [33me4c551b[m Merge pull request #33 from maxiknows/jihad-feat-login-redirect
+[1;33m|[m[1;34m\[m  
+[1;33m|[m * [33m09b6c72[m feat: redirect after successful login
+[1;33m|[m[1;33m/[m  
+*   [33mdb9c65b[m Merge pull request #32 from maxiknows/jihad-feat-register-redirect
+[1;35m|[m[1;36m\[m  
