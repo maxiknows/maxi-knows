@@ -24,6 +24,8 @@
     - A weather widget was added under the search bar. It uses the
       browser's geolocation API to get the visitor's coordinates, then
       calls the backend's /api/weather proxy (Open-Meteo, cached).
+      There is no fallback location: if anything fails, the real error
+      is shown in the widget and logged to the console.
 -->
 
 {{ define "body" }}
@@ -104,11 +106,31 @@
     }
 
     // Ask the browser for the visitor's location, then fetch weather for it.
+    // No fallback coordinates: failures are shown on the page and in the console.
     function loadWeather() {
         const current = document.getElementById("weather-current");
 
+        function showGeoError(err) {
+            const reasons = {
+                1: "permission denied, or the page isn't served over HTTPS",
+                2: "position unavailable (the OS couldn't determine a location)",
+                3: "request timed out"
+            };
+            const reason = reasons[err.code] ?? "unknown error";
+            console.error("Geolocation error", err.code, err.message);
+            current.textContent = `Weather unavailable: ${reason} [${err.message}]`;
+        }
+
         if (!navigator.geolocation) {
-            current.textContent = "Weather unavailable (no geolocation support)";
+            console.error("Geolocation not supported by this browser");
+            current.textContent = "Weather unavailable: geolocation not supported by this browser";
+            return;
+        }
+
+        if (!window.isSecureContext) {
+            const msg = "insecure origin (" + location.origin + "), geolocation requires HTTPS or localhost";
+            console.error("Geolocation blocked:", msg);
+            current.textContent = "Weather unavailable: " + msg;
             return;
         }
 
@@ -118,9 +140,7 @@
                 fetchWeather(latitude, longitude);
                 fetchLocationName(latitude, longitude);
             },
-            () => {
-                current.textContent = "Weather unavailable (location permission denied)";
-            },
+            showGeoError,
             // Coarse, cached position is plenty for a forecast and avoids a slow GPS fix.
             { enableHighAccuracy: false, maximumAge: 15 * 60 * 1000, timeout: 10000 }
         );
@@ -133,8 +153,7 @@
             const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
 
             if (!res.ok) {
-                current.textContent = "Weather unavailable";
-                return;
+                throw new Error(`/api/weather returned HTTP ${res.status} ${res.statusText}`);
             }
 
             const data = await res.json();
@@ -143,22 +162,26 @@
 
             current.textContent = `${emoji} ${temp}°C — ${label}`;
         } catch (err) {
-            current.textContent = "Weather unavailable";
+            console.error("fetchWeather failed:", err);
+            current.textContent = `Weather unavailable: ${err.message}`;
         }
     }
 
-    // The place name is a nice-to-have, so on failure just leave it blank.
     async function fetchLocationName(lat, lon) {
         const locationEl = document.getElementById("weather-location");
 
         try {
             const res = await fetch(`/api/location?lat=${lat}&lon=${lon}`);
-            if (!res.ok) return;
+
+            if (!res.ok) {
+                throw new Error(`/api/location returned HTTP ${res.status} ${res.statusText}`);
+            }
 
             const data = await res.json();
             locationEl.textContent = `📍 ${data.name}`;
         } catch (err) {
-            // Intentionally ignored.
+            console.error("fetchLocationName failed:", err);
+            locationEl.textContent = `Location name unavailable: ${err.message}`;
         }
     }
 </script>
