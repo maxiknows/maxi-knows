@@ -1,4 +1,6 @@
-# Whoknows Variations
+# Maxi Knows
+
+[![Maintainability](https://qlty.sh/gh/maxiknows/projects/maxi-knows/maintainability.svg)](https://qlty.sh/gh/maxiknows/projects/maxi-knows)
 
 This is the Whoknows variations repository. It is not meant for production as it contains several security vulnerabilities and problematic parts on purpose. 
 
