@@ -1,11 +1,8 @@
-package main
+package storage
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
-
-	_ "modernc.org/sqlite"
 )
 
 type Page struct {
@@ -13,73 +10,6 @@ type Page struct {
 	URL      string
 	Language string
 	Content  string
-}
-
-func main() {
-	db, err := sql.Open("sqlite", "../data/whoknows.db")
-	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
-	}
-	defer db.Close()
-
-	// This inserts a hardcoded test user named "johndoe".
-	// Because the username and email are UNIQUE in the database,
-	// running this file more than once may cause a UNIQUE constraint error
-	// if johndoe already exists.
-	lastID, err := InsertUserQuery(db)
-	if err != nil {
-		log.Printf("InsertUserQuery error: %v", err)
-	} else {
-		fmt.Printf("InsertUserQuery: Inserted user with id %d\n", lastID)
-	}
-
-	userID, err := GetUserIDQuery(db)
-	if err != nil {
-		log.Printf("GetUserIDQuery error: %v", err)
-	} else {
-		fmt.Printf("GetUserIDQuery: User 'johndoe' has id %d\n", userID)
-	}
-
-	id, username, email, password, err := GetUserByIDQuery(db)
-	if err != nil {
-		log.Printf("GetUserByIDQuery error: %v", err)
-	} else {
-		fmt.Printf(
-			"GetUserByIDQuery: id=%d username=%s email=%s password=%s\n",
-			id,
-			username,
-			email,
-			password,
-		)
-	}
-
-	id, username, email, password, err = GetUserByUsernameQuery(db)
-	if err != nil {
-		log.Printf("GetUserByUsernameQuery error: %v", err)
-	} else {
-		fmt.Printf(
-			"GetUserByUsernameQuery: id=%d username=%s email=%s password=%s\n",
-			id,
-			username,
-			email,
-			password,
-		)
-	}
-
-	pages, err := SearchPagesQuery(db, "golang", "en")
-	if err != nil {
-		log.Printf("SearchPagesQuery error: %v", err)
-	} else {
-		for _, page := range pages {
-			fmt.Printf(
-				"SearchPagesQuery: title=%s url=%s language=%s content=%s\n",
-				page.Title,
-				page.URL,
-				page.Language,
-				page.Content,
-			)
-		}
-	}
 }
 
 // InsertUserQuery inserts a hardcoded test user into the database.
