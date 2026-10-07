@@ -30,6 +30,9 @@ FROM debian:bookworm-slim
 #Set /app/go as the working dir:
 WORKDIR /app/go
 
+# Create a non-root user for running the application:
+RUN useradd --create-home --uid 10001 appuser
+
 #Copy the compiled executable from the builder stage:
 COPY --from=builder /app/maxi-knows ./maxi-knows
 
@@ -43,6 +46,13 @@ COPY go/static ./static
 #Port:
 EXPOSE 8080
 
+
+
+
+
+
+# Run the application as a non-root user:
+USER appuser
 
 #After build / when the container starts = CMD
 #Start the maxi-knows app when the container starts:
