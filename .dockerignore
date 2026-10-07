@@ -1,0 +1,6 @@
+# Do not include the SQLite database in the Docker build context
+data/*.db
+
+# Git files are not needed when building the image
+.git
+.gitignore
