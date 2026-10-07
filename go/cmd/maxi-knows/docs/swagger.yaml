@@ -1,0 +1,310 @@
+basePath: /
+definitions:
+  main.ErrorResponse:
+    properties:
+      message:
+        example: q is required
+        type: string
+      statusCode:
+        example: 422
+        type: integer
+    type: object
+  main.LocationResponse:
+    properties:
+      name:
+        example: Copenhagen, Denmark
+        type: string
+    type: object
+  main.MessageResponse:
+    properties:
+      message:
+        example: Logged out
+        type: string
+      statusCode:
+        example: 200
+        type: integer
+    type: object
+  main.SearchResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/main.SearchResult'
+        type: array
+    type: object
+  main.SearchResult:
+    properties:
+      Description:
+        type: string
+      Title:
+        type: string
+      URL:
+        type: string
+    type: object
+  main.WeatherCurrent:
+    properties:
+      temperature_2m:
+        example: 14.2
+        type: number
+      weather_code:
+        example: 3
+        type: integer
+    type: object
+  main.WeatherDaily:
+    properties:
+      temperature_2m_max:
+        items:
+          type: number
+        type: array
+      temperature_2m_min:
+        items:
+          type: number
+        type: array
+      time:
+        items:
+          type: string
+        type: array
+      weather_code:
+        items:
+          type: integer
+        type: array
+    type: object
+  main.WeatherResponse:
+    properties:
+      current:
+        $ref: '#/definitions/main.WeatherCurrent'
+      daily:
+        $ref: '#/definitions/main.WeatherDaily'
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Search, user and weather endpoints for the WhoKnows search app.
+  title: WhoKnows Search API
+  version: "1.0"
+paths:
+  /api/location:
+    get:
+      description: Looks up a city-level place name via Nominatim. Coordinates are
+        rounded to 2 decimals and responses are cached for 24 hours (see the X-Cache
+        header).
+      parameters:
+      - description: Latitude (-90 to 90)
+        example: 55.68
+        in: query
+        name: lat
+        required: true
+        type: number
+      - description: Longitude (-180 to 180)
+        example: 12.57
+        in: query
+        name: lon
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Cache:
+              description: HIT or MISS
+              type: string
+          schema:
+            $ref: '#/definitions/main.LocationResponse'
+        "400":
+          description: valid lat and lon are required
+          schema:
+            type: string
+        "404":
+          description: Location not found
+          schema:
+            type: string
+        "500":
+          description: Failed to encode location
+          schema:
+            type: string
+        "502":
+          description: Failed to look up location
+          schema:
+            type: string
+      summary: Reverse-geocode coordinates
+      tags:
+      - weather
+  /api/login:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Verifies the password (bcrypt, with transparent upgrade of legacy
+        MD5 hashes) and redirects to / on success. If username or password is missing
+        entirely, the response is 422 with an empty JSON object. No session or token
+        is issued.
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "303":
+          description: Redirect to /
+          schema:
+            type: string
+        "401":
+          description: Invalid username or password
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "422":
+          description: Missing fields
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Database or hashing error
+          schema:
+            type: string
+      summary: Log in
+      tags:
+      - users
+  /api/logout:
+    get:
+      description: Returns a confirmation message. There is no server-side session
+        to end.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.MessageResponse'
+      summary: Log out
+      tags:
+      - users
+  /api/register:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Validates the form, rejects duplicate usernames/emails, stores
+        a bcrypt hash and redirects to /login. If any of the four fields is missing
+        entirely, the response is 422 with an empty JSON object.
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Email address (must contain @)
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: Password repeated (must match)
+        in: formData
+        name: password2
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "303":
+          description: Redirect to /login
+          schema:
+            type: string
+        "409":
+          description: Username or email already exists
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "422":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Database or hashing error
+          schema:
+            type: string
+      summary: Register a user
+      tags:
+      - users
+  /api/search:
+    get:
+      description: Returns pages in the given language whose content contains the
+        query string.
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - default: en
+        description: Language code
+        in: query
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.SearchResponse'
+        "422":
+          description: q is missing
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Database error
+          schema:
+            type: string
+      summary: Search pages
+      tags:
+      - search
+  /api/weather:
+    get:
+      description: Proxies Open-Meteo for the given coordinates. Coordinates are rounded
+        to 2 decimals and responses are cached for 15 minutes (see the X-Cache header).
+      parameters:
+      - description: Latitude (-90 to 90)
+        example: 55.68
+        in: query
+        name: lat
+        required: true
+        type: number
+      - description: Longitude (-180 to 180)
+        example: 12.57
+        in: query
+        name: lon
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            X-Cache:
+              description: HIT or MISS
+              type: string
+          schema:
+            $ref: '#/definitions/main.WeatherResponse'
+        "400":
+          description: valid lat and lon are required
+          schema:
+            type: string
+        "502":
+          description: Failed to fetch weather
+          schema:
+            type: string
+      summary: Get weather forecast
+      tags:
+      - weather
+swagger: "2.0"
