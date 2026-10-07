@@ -1,5 +1,36 @@
 # Maxi Knows
 
+Maxi Knows is a DevOps project developed as part of the Datamatiker education at KEA.
+
+The project is based on a legacy version of the WhoKnows application and focuses on modernising, securing and deploying an existing application rather than building a new system from scratch.
+
+The original application was written in Python and contains several intentionally outdated or problematic implementations. As part of the project, we are gradually rewriting the application in Go while improving the project structure, security, maintainability and deployment process.
+
+## Project goals
+
+The main focus of the project is to work with real-world DevOps and legacy modernisation challenges, including:
+
+- Migrating legacy Python functionality to Go
+- Refactoring the project structure
+- Improving password security and authentication
+- Working with SQLite and database persistence
+- Code quality analysis with SonarQube Cloud and Qlty
+- Git and GitHub workflows using branches and pull requests
+- Deployment to a Linux VM
+- Automated database backups
+- Maintaining and improving an existing codebase as a team
+
+## Technologies
+
+- Go
+- Python (legacy application)
+- SQLite
+- HTML / CSS
+- Git & GitHub
+- Linux
+- SonarQube Cloud
+- Qlty
+
 ## Code quality
 
 **SonarQube Cloud**
@@ -10,26 +41,22 @@
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=maxiknows_maxi-knows&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=maxiknows_maxi-knows)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=maxiknows_maxi-knows&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=maxiknows_maxi-knows)
 
-**CodeClimate**
+**Qlty**
 
 [![Maintainability](https://qlty.sh/gh/maxiknows/projects/maxi-knows/maintainability.svg)](https://qlty.sh/gh/maxiknows/projects/maxi-knows)
 
----
+## Project structure
 
-This is the Whoknows variations repository. It is not meant for production as it contains several security vulnerabilities and problematic parts on purpose.
+The repository contains both the original legacy implementation and the newer Go implementation.
 
-## How to get started
+```text
+go/
+├── cmd/
+│   ├── maxi-knows/
+│   └── init-db/
+├── internal/
+│   └── storage/
+├── templates/
+└── static/
 
-Each branch is a tutorial in a different topic based on the same Flask application as in the `main` branch.
-
-One way to follow along is by:
-
-1. Forking the repository to your own account.
-2. Cloning the repository to your local machine.
-3. Checking out the branch you are interested in (e.g. `git checkout <branch_name>`).
-4. Following the instructions in the README of the branch.
-5. You can now push changes to your own repository.
-
-## Pull requests
-
-If you have any suggestions or improvements to the tutorials, feel free to open a pull request.
+legacy-python/
