@@ -17,6 +17,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
+
+	"maxi-knows/internal/storage"
 )
 
 // PageData contains the data that can be passed from the Go backend
@@ -130,13 +132,41 @@ func pageHandler(page string) http.HandlerFunc {
 
 // searchPageHandler handles GET requests to the search page.
 // It reads the search query from the URL and passes it to the template.
-func searchPageHandler(w http.ResponseWriter, r *http.Request) {
-	data := PageData{
-		Query:         r.URL.Query().Get("q"),
-		SearchResults: []SearchResult{},
-	}
+func searchPageHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
 
-	renderTemplate(w, "search.html", data)
+		data := PageData{
+			Query:         query,
+			SearchResults: []SearchResult{},
+		}
+
+		if query != "" {
+			pages, err := storage.SearchPagesQuery(db, query, "en")
+			if err != nil {
+				log.Printf("Search failed: %v", err)
+				http.Error(w, "Database error", http.StatusInternalServerError)
+				return
+			}
+
+			for _, page := range pages {
+				description := []rune(page.Content)
+
+				if len(description) > 400 {
+					description = description[:400]
+					description = append(description, []rune(" ...")...)
+				}
+
+				data.SearchResults = append(data.SearchResults, SearchResult{
+					URL:         page.URL,
+					Title:       page.Title,
+					Description: string(description),
+				})
+			}
+		}
+
+		renderTemplate(w, "search.html", data)
+	}
 }
 
 // parseCoords reads, validates and rounds the lat/lon query parameters.
@@ -317,7 +347,7 @@ func main() {
 	// HTML routes
 
 	// GET /SEARCH
-	http.HandleFunc("GET /{$}", searchPageHandler)
+	http.HandleFunc("GET /{$}", searchPageHandler(db))
 
 	// GET /REGISTER
 	http.HandleFunc("GET /register", pageHandler("register.html"))
