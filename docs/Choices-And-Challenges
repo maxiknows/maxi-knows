@@ -1,0 +1,245 @@
+# **Choices and Challenges**
+
+Decisions, problems and thought processes from the Maxi Knows (WhoKnows) rewrite: from a Python 2 / Flask legacy app to a Go application.
+
+**How to read this file**
+- Entries are grouped by area. Each has a type (Decision / Challenge), who was involved, and the reasoning.
+- ⚠️ **Missing** marks reasoning nobody wrote down. These are gaps to fill in as a group before the exam, not things to guess at.
+- ⚠️ **Confirm** marks a statement that follows from the notes but was not written down explicitly.
+- Dates are 2026.
+
+---
+
+## **1. Architecture and repository**
+
+### **Rewrite the legacy app in Go, standard library only**
+- **Type:** Decision
+- **Who:** Group (Olga, Silke, Jihad, Tobias)
+- **When:** 4 Sep (framework decision), 4-11 Sep (prototype and rewrite start)
+- **Context:** We inherited a Python 2 / Flask / Jinja app with SQLite. The rewrite language had to be chosen. Go and Ruby were the languages discussed in class.
+- **Options considered:** Go with the standard library only; Go with a framework/router (Gorilla was raised); Ruby.
+- **Outcome:** Go with the standard library. Pages use Go's `html/template`.
+- **Why:** ⚠️ **Missing.** The 4 Sep notes say the group did not know how to choose between the standard library and Gorilla. What *is* documented is how we tried to learn enough to decide: before committing, we built a separate Go prototype on the branch `go-sqlite-setup` (Go module `whoknows`, a SQLite driver, `init_db.go` to create tables, `queries.go` for users and page search) to compare Go's syntax and usability with Python.
+- **Trade-offs / lessons:** ⚠️ **Missing.** Also missing: why Go over Ruby, and why this SQLite driver.
+
+### **One monorepo: `legacy-python/` and `go/` side by side**
+- **Type:** Decision (later restructured)
+- **Who:** Group
+- **Context:** During the migration both the legacy and the new code must live somewhere, and the legacy app is our reference for behaviour.
+- **Options considered:** Monorepo vs. multiple repos (documentation, legacy and Go in separate repos). Class notes list the monorepo arguments: transparency, and separate CI/CD pipelines per folder.
+- **Outcome:** One repository.
+- **Why:** The notes give the practical reason: both versions at the root, split by folder, so it is easy to see which code you are in.
+- **Reversal:** The first layout kept the legacy app in `src/` next to `go/`. It was unclear which code was old and which was new, so the repo was restructured into `legacy-python/` (original app), `go/` (new app), `data/` (local database) and `docs/`.
+
+### **Keep the SQLite database out of source code and out of Git**
+- **Type:** Decision
+- **Context:** Database files existed in more than one place in the repo, mixed with source code, so it was unclear which one the app used.
+- **Outcome:** One `data/` directory for the local SQLite file, excluded via `.gitignore`.
+- **Why:** Separates runtime data from code and removes the "which database is the real one" question.
+- **Open:** SQLite → Postgres was mentioned in class. ⚠️ **Missing:** was it considered for our project, and why was SQLite kept?
+
+---
+
+## **2. Workflow and collaboration**
+
+### **GitHub Flow as branching strategy**
+- **Type:** Decision
+- **Who:** Group
+- **Context:** The course required choosing a branching strategy (mandatory assignment, 18 Sep).
+- **Options considered:** GitHub Flow; Git Flow (permanent `develop` and `release` branches).
+- **Outcome:** GitHub Flow. Branch from `main` → name by purpose (`feat`, `fix`, `refactor`) → commit → push and open a PR using our PR template → review → merge → delete the branch.
+- **Why:** It is simple, it gives one always-deployable `main`, and it fits a project our size. Git Flow added complexity we did not see a need for.
+- **Trade-offs / lessons:** A bad change merged to `main` could hit the deployable version, so review and testing before merge matter (not experienced so far). Branches that live too long fall behind `main`; this *has* happened to us, so branches must stay short-lived. It needs good communication when several people touch related parts (we split login, weather API and linting across people).
+
+### **Branch names, commit messages and PR/issue templates**
+- **Type:** Decision
+- **Who:** Group
+- **Outcome:** Branch names are `<name>-<type>-<topic>` (e.g. `silke-feat-endpoints`). Commit types: `feat`, `fix`, `style`, `test`, `refactor`, `docs` (e.g. `feat: rewrite register page in Go`). A PR template (based on the course template) and an issue template are in the repo. Direct pushes to `main` are not allowed by agreement.
+- **Why:** Course principle "work in small batches": smaller, more frequent commits, and a consistent PR process. ⚠️ **Missing:** why these specific types, and who proposed them.
+
+### **Branch protection rules: not enforced yet**
+- **Type:** Open decision
+- **Context:** The group asked: "can we stop people pushing to `main` without a PR?" Right now that depends on everyone remembering.
+- **Status:** GitHub rulesets were identified as the tool. The notes say the group would ask AI what to define. ⚠️ **Missing:** whether the rules were created, and which.
+
+### **GitHub organization, no license**
+- **Type:** Decision
+- **Outcome:** We created a GitHub organization, and chose not to add a license.
+- **Why (organization):** Repositories can be shared as a group, instead of one person owning the repo and the others being added as collaborators.
+- **Why (no license):** ⚠️ **Missing.**
+
+---
+
+## **3. Infrastructure and deployment**
+
+### **Run the app on an Azure VM as a `systemd` service**
+- **Type:** Decision
+- **Who:** Silke
+- **When:** 24 Sep
+- **Context:** The app was first started by hand on the VM (`go run`). It stopped whenever the SSH session ended.
+- **Outcome:** A `systemd` unit that runs a built binary from `/usr/local/bin`, with `Restart=on-failure`.
+- **Why:** The service starts automatically and restarts itself if the process fails.
+- **Why Azure and this region:** ⚠️ **Missing.**
+
+### **Challenge: `systemd` refused to start the binary (SELinux)**
+- **Type:** Challenge
+- **Who:** Silke
+- **Symptom:** The service failed with `status=203/EXEC`, but the program ran fine when started manually, so the Go code was not at fault.
+- **Diagnosis:** The binary was built inside the project folder and got the SELinux type `user_tmp_t`. SELinux does not let `systemd` execute files with that type.
+- **Fix:** Copy the built binary to `/usr/local/bin/maxi-knows`, where it gets the type `bin_t`.
+- **Lesson:** "Works manually, fails under systemd" is a hint to check SELinux and file context. A consequence is that every deploy must copy the binary to that location.
+
+### **Manual deployment process**
+- **Type:** Decision (current state)
+- **Who:** Silke
+- **Process:** SSH to VM → `git switch main` → `git pull origin main` → `cd go` → `go build -o maxi-knows ./cmd/maxi-knows` → `sudo systemctl stop maxi-knows` → `sudo cp maxi-knows /usr/local/bin/maxi-knows` → `sudo systemctl restart maxi-knows` → `systemctl status maxi-knows`. The service must be stopped before copying, otherwise the binary is in use.
+- ⚠️ **Missing:** The schedule marks "Deploy" as done on 11 Sep, and a GitHub Actions workflow is mentioned, but none of the notes describe how automated deployment works. Document it here: trigger, what it runs, and how it reaches the VM.
+
+### **Challenge: a feature branch ended up on the VM**
+- **Type:** Challenge (open)
+- **When:** 30 Sep
+- **Context:** After the weather API was implemented (Tobias), the deployment apparently pushed his feature branch straight to the VM. We only want `main` deployed.
+- **Status:** ⚠️ **Missing:** cause and fix. A follow-up problem was also logged: the VM returns "weather unavailable", which looks like a permissions issue. A separate issue was opened for it.
+
+### **Challenge: the VM silently created an empty database**
+- **Type:** Challenge
+- **Who:** Silke
+- **When:** 20 Sep
+- **Context:** The VM needed access to the real data.
+- **Diagnosis:** The Go program has a database path. When no file exists there, it creates an empty database instead of failing. The VM had therefore ended up with an empty `whoknows.db`.
+- **Fix:** Copied our real database to the VM with `scp`, and renamed the empty file to keep it.
+- **Lesson:** ⚠️ **Confirm:** a missing database file should probably be an error at startup, not something the program quietly creates. This is a design question for the group.
+
+### **Database backups**
+- **Type:** Decision (interim) and open question
+- **Who:** Silke
+- **When:** 2-6 Oct
+- **Current process:** SSH into the VM, copy the database, `scp` it to a local machine, upload to the team Google Drive. Done by hand on 6 Oct.
+- **Open:** Automate it, or agree how often to do it manually? Not decided.
+
+---
+
+## **4. Security**
+
+### **Replace MD5 password hashing with bcrypt, with a gradual migration**
+- **Type:** Decision
+- **Who:** Olga (branch `olga-fix-password-security`)
+- **When:** 29 Sep
+- **Context:** SonarCloud flagged MD5 for password storage in `main.go`. MD5 is old and weak. But the database already held users from the course simulation with MD5 hashes.
+- **Options considered:** Switch to bcrypt immediately (existing users could no longer log in); or migrate gradually.
+- **Outcome:** New registrations use bcrypt. On login, the app checks whether the stored hash is bcrypt. If it is an old MD5 hash and the password is correct, the password is re-hashed with bcrypt and the database is updated on the spot.
+- **Why:** Keeps the existing simulation users working while moving everyone to bcrypt without a forced reset.
+- **Trade-offs / lessons:** ⚠️ **Confirm:** users who never log in again keep their MD5 hash. If that matters, consider a deadline after which MD5 login is removed. The MD5 verification code path must stay until then.
+
+### **Remove `DROP TABLE IF EXISTS users` and the hardcoded admin from `init_db.go`**
+- **Type:** Decision, found while fixing the above
+- **Who:** Olga
+- **Context:** `init_db.go` dropped the `users` table on every run, so re-running initialization would delete all users. It also created an admin user with an MD5 hash.
+- **Outcome:** Tables are created with `CREATE TABLE IF NOT EXISTS`. The hardcoded admin is gone; users are created through normal registration (bcrypt).
+
+### **Known limitation: no sessions**
+- **Type:** Challenge (open)
+- **Who:** Olga (endpoint test, 23 Sep)
+- **Finding:** Login redirects but issues no session or token, so the app cannot show that someone is logged in, and `/api/logout` has nothing to end. The API docs state this explicitly.
+- **Status:** ⚠️ **Missing:** is session handling planned?
+
+---
+
+## **5. Legacy code and software quality**
+
+### **Modernize the legacy app to Python 3 first, then rewrite**
+- **Type:** Decision and challenge
+- **Who:** Group
+- **When:** 28 Aug (upgrade assignment)
+- **Context:** The legacy app needed to run before we could understand it well enough to rewrite it.
+- **Challenges and fixes:**
+  - *Pinned dependencies* (`Flask==0.5`, `Jinja2==2.4`, `Werkzeug==0.6.1`, `setuptools==44.1.1`) could not be installed on a modern Python. Fix: remove the version pins after guidance from the teacher.
+  - *`2to3` did not work on Python 3.14*, because `lib2to3` was removed. Fix: install Python 3.12 with `uv` and recreate the virtual environment.
+  - `2to3` converted `app.py` (print statements, a `__future__` import) and made a `.bak` backup, which is now git-ignored along with `backup_files/`.
+- **Why an intermediate step:** The original could not run on a supported Python. The Go rewrite removes the Python 2 dependency permanently, while the Python 3 version is the working reference in the meantime.
+- **Trade-offs / lessons:** Removing pins means unpinned, newer versions. This is acceptable for a throwaway reference app, but would not be for production.
+
+### **Clean up the legacy scripts: Makefile, `run_forever.sh`, line endings**
+- **Type:** Decision and challenge
+- **Context:** The Makefile and shell script called `python2`. ShellCheck found an unquoted path, an unused `TMP` variable, and exit-code handling that lost the real exit code. The project is developed partly on Windows, so shell scripts had CRLF line endings, which break on Linux.
+- **Outcome:** `python2` → `python3`; path quoted; exit code saved immediately (`exit_code=$?`); ShellCheck now reports nothing. `.gitattributes` forces LF: `*.sh text eol=lf` and `Makefile text eol=lf`.
+- **Why:** Same behaviour on every developer's OS.
+
+### **Legacy tests were not fixed**
+- **Type:** Decision to defer
+- **Context:** `app_tests.py` fails in `tearDown()` (`unlink()` on a temp file object does not exist in Python 3). The failure is in cleanup, so it does not necessarily mean login, register or search are broken.
+- **Outcome:** Documented, not fixed. Fixing it was not part of the assignment. The tests are to be replaced as part of the rewrite.
+
+### **Use SonarCloud and Qlty for software quality; ignore the legacy code**
+- **Type:** Decision
+- **Who:** Olga
+- **When:** 24-30 Sep
+- **Options considered:** SonarCloud (SonarQube), Code Climate / Qlty, CodeRabbit, DeepSource.
+- **Outcome:** SonarCloud and Qlty are connected to the repo. Issues SonarCloud reports in `legacy-python/` are marked as ignored instead of fixed.
+- **Why:** Olga's view: SonarCloud focuses on things like security, rather than the formatting a linter catches. Silke asked whether this overlaps with linting and whether we are allowed to change legacy code at all. ⚠️ **Missing:** why these two tools out of the four, and the explicit reason for ignoring legacy findings (most likely that it is being replaced, but not written down).
+- **Related:** Linting itself is still marked TODO on the schedule.
+
+### **Refactor the Go storage package (`main redeclared`)**
+- **Type:** Challenge, with a reversal
+- **Who:** Olga
+- **When:** 29 Sep
+- **Context:** `init_db.go` and `queries.go` both lived in `internal/storage` and each had its own `func main()`. Early on we noted this and moved on, since they were meant as two standalone programs and each ran fine alone. Qlty then failed the build with `main redeclared in this block`.
+- **Diagnosis:** In Go, all files in one directory are one package, and a package can have only one `main()`.
+- **Fix:** `internal/storage` is now `package storage` with no `main()`. Initialization became `InitDB(db *sql.DB)`. A new program in `go/cmd/init-db/main.go` opens the database and calls it. `queries.go` was kept for the planned consolidation of queries.
+- **Result:** The Qlty workflow passes. Two typecheck warnings about imports of `internal/storage` and `modernc.org/sqlite` remain. They appear to be Qlty's Go configuration, not the code, since it builds locally. Still being investigated.
+- **Lesson:** `cmd/` holds runnable programs; `internal/` holds reusable code without `main()`.
+
+### **Add form labels to the Go templates (accessibility)**
+- **Type:** Decision
+- **Who:** Olga
+- **Context:** SonarCloud flagged inputs without `<label>` in `login.html`, `register.html` and `search.html`.
+- **Outcome:** Labels linked via `for`/`id`. `name` attributes were untouched, so the forms send the same values to the backend.
+
+---
+
+## **6. Features and API**
+
+### **Weather: Open-Meteo for forecasts, Nominatim for place names, with caching**
+- **Type:** Decision
+- **Who:** Tobias (implementation)
+- **Context:** The course's "consumer report" assignment required a weather page backed by an external API.
+- **Outcome:** `GET /api/weather` proxies Open-Meteo, with responses cached for 15 minutes. `GET /api/location` reverse-geocodes via Nominatim, cached for 24 hours. In both, coordinates are rounded to 2 decimals and an `X-Cache` header reports HIT or MISS.
+- **Why:** ⚠️ **Missing:** why these two APIs, why proxy them through our backend, and why the cache durations and rounding. (Rounding to 2 decimals means nearby requests share a cache entry, which is probably the point, but confirm.)
+- **Challenge:** Silke raised that the weather endpoint must work for the course session and Olga (24 Sep) noted it was hard to know what "done" meant for weather. On the VM, the endpoint returns "weather unavailable" (see section 3).
+
+### **Generate the API spec with Swaggo (Swagger 2.0)**
+- **Type:** Decision
+- **Who:** Group
+- **Context:** Mandatory assignment: produce an OpenAPI specification for our application.
+- **Outcome:** Handlers are annotated with Swaggo comments, and `swagger.json` and `swagger.yaml` are generated from them. The result covers `/api/search`, `/api/login`, `/api/register`, `/api/logout`, `/api/weather` and `/api/location`.
+- **Why:** The spec can be generated from code rather than written by hand, so it stays in sync, and it can be diffed against the spec handed out in class.
+- **Trade-offs / lessons:** The generated file declares `"swagger": "2.0"`, not OpenAPI 3.x, which is what the course material discusses. ⚠️ **Confirm:** whether that matters for the assignment.
+
+### **Monitor the API with Postman**
+- **Type:** Decision and challenge
+- **Who:** Silke
+- **When:** 6 Oct
+- **Outcome:** Two tests on `GET /api/search?q=JavaScript`: status is 200 and the body is not empty. The monitor runs hourly.
+- **Challenge 1:** Postman only accepted tests on *all* endpoints of a collection when creating a monitor, so a new collection with a single endpoint was made.
+- **Challenge 2:** Sharing the monitor link requires a paid plan. The free plan allows about 1000 requests/month; hourly runs use about 720/month, which is close to the limit.
+- **Open:** One shared monitor owned by Silke, or one each? Not decided (separate monitors would multiply request usage against the limits).
+
+---
+
+## **7. Open items (need an answer from the group)**
+
+| # | Item | Who could answer |
+|---|------|------------------|
+| 1 | Why Go over Ruby, and why the standard library over Gorilla | Everyone |
+| 2 | Are branch protection rules / rulesets actually enabled? | Whoever has repo admin |
+| 3 | How does automated deployment work, and why did it deploy a feature branch? | Silke, Tobias |
+| 4 | Fix for the "weather unavailable" error on the VM | Tobias |
+| 5 | Why the weather APIs and cache settings? | Tobias |
+| 6 | Why SonarCloud and Qlty, and why ignore legacy findings? | Olga |
+| 7 | Backups: automate or manual schedule? | Silke |
+| 8 | Should a missing database file be an error instead of silently creating an empty one? | Group |
+| 9 | Retire MD5 login after a deadline? | Olga |
+| 10 | Session handling for login/logout | Group |
+| 11 | Postman monitor ownership | Silke |
+| 12 | Why Azure and the chosen region; why no license | Group |
+| 13 | Contributions and reasoning from Jihad (none of the source documents mention any) | Jihad |
