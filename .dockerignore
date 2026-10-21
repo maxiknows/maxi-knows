@@ -4,3 +4,9 @@ data/*.db
 # Git files are not needed when building the image
 .git
 .gitignore
+
+# Secrets and environment files
+.env
+.env.*
+**/.env
+**/.env.*
