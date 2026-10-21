@@ -113,18 +113,13 @@ func renderTemplate(w http.ResponseWriter, page string, data PageData) {
 	}
 }
 
-// pageHandler creates a HTTP handler for pages that only need
-// to render a template using the shared layout.
-//
-// The page parameter decides which page-specific template is rendered.
-// For example, pageHandler("about.html") renders about.html together
-// with layout.html.
-func pageHandler(page string) http.HandlerFunc {
+// pageHandler renders a page with the current user's session data.
+func pageHandler(db *sql.DB, page string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// Create the data object that is passed to the templates.
-		// Username and Flashes are empty for now.
-		data := PageData{}
+		data := PageData{
+			Username: getLoggedInUsername(db, r),
+		}
 
 		renderTemplate(w, page, data)
 	}
@@ -137,6 +132,7 @@ func searchPageHandler(db *sql.DB) http.HandlerFunc {
 		query := r.URL.Query().Get("q")
 
 		data := PageData{
+			Username:      getLoggedInUsername(db, r),
 			Query:         query,
 			SearchResults: []SearchResult{},
 		}
@@ -350,14 +346,13 @@ func main() {
 	http.HandleFunc("GET /{$}", searchPageHandler(db))
 
 	// GET /REGISTER
-	http.HandleFunc("GET /register", pageHandler("register.html"))
+	http.HandleFunc("GET /register", pageHandler(db, "register.html"))
 
 	// GET /LOGIN
-	http.HandleFunc("GET /login", pageHandler("login.html"))
+	http.HandleFunc("GET /login", pageHandler(db, "login.html"))
 
 	// GET /ABOUT
-	// Render the about page using the shared pageHandler.
-	http.HandleFunc("GET /about", pageHandler("about.html"))
+	http.HandleFunc("GET /about", pageHandler(db, "about.html"))
 
 	// Serve files from the static folder.
 	// For example:
@@ -645,18 +640,63 @@ func main() {
 			return
 		}
 
+		// Generate a secure session token.
+		token, tokenHash, err := generateSessionToken()
+		if err != nil {
+			http.Error(w, "Could not create session", http.StatusInternalServerError)
+			return
+		}
+
+		// Store the hashed token in SQLite.
+		expiresAt := time.Now().Add(24 * time.Hour)
+
+		if err := storage.CreateSession(db, tokenHash, userID, expiresAt); err != nil {
+			http.Error(w, "Could not save session", http.StatusInternalServerError)
+			return
+		}
+
+		// Send the session token to the browser.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    token,
+			Path:     "/",
+			Expires:  expiresAt,
+			MaxAge:   24 * 60 * 60,
+			HttpOnly: true,
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteLaxMode,
+		})
+
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
-	// GET /API/LOGOUT
-	http.HandleFunc("GET /api/logout", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+	// POST /API/LOGOUT
+	http.HandleFunc("POST /api/logout", func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session")
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"statusCode": 200,
-			"message":    "Logged out",
+		if err == nil {
+			// Hash the session token to find it in SQLite.
+			tokenHash := hashSessionToken(cookie.Value)
+
+			// Remove the session from the database.
+			if err := storage.DeleteSession(db, tokenHash); err != nil {
+				http.Error(w, "Could not log out", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Remove the session cookie from the browser.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteLaxMode,
 		})
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	})
 
 	// GET /API/WEATHER
@@ -665,7 +705,10 @@ func main() {
 	// GET /API/LOCATION
 	http.HandleFunc("GET /api/location", locationHandler)
 
+	// Protect the application against cross-origin requests.
+	csrf := http.NewCrossOriginProtection()
+
 	// Start the web server on port 8080.
 	log.Println("Server running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", csrf.Handler(http.DefaultServeMux)))
 }
