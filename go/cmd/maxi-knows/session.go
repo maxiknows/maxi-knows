@@ -1,14 +1,13 @@
-
 package main
 
 import (
-    "crypto/rand"
-    "crypto/sha256"
-    "database/sql"
-    "encoding/hex"
-    "net/http"
+	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"net/http"
 
-    "maxi-knows/internal/storage"
+	"maxi-knows/internal/storage"
 )
 
 // generateSessionToken creates a random session token
@@ -27,28 +26,27 @@ func generateSessionToken() (string, string, error) {
 	return token, tokenHash, nil
 }
 
+// getLoggedInUsername finds the user associated
+// with the session cookie.
+func getLoggedInUsername(db *sql.DB, r *http.Request) string {
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		return ""
+	}
 
- // getLoggedInUsername finds the user associated
- // with the session cookie.
- func getLoggedInUsername(db *sql.DB, r *http.Request) string {
-     cookie, err := r.Cookie("session")
-     if err != nil {
-         return ""
-     }
+	// Hash the cookie value before looking it up in SQLite.
+	hash := sha256.Sum256([]byte(cookie.Value))
+	tokenHash := hex.EncodeToString(hash[:])
 
-     // Hash the cookie value before looking it up in SQLite.
-     hash := sha256.Sum256([]byte(cookie.Value))
-     tokenHash := hex.EncodeToString(hash[:])
+	username, err := storage.GetSessionUsername(db, tokenHash)
+	if err != nil {
+		return ""
+	}
 
-     username, err := storage.GetSessionUsername(db, tokenHash)
-     if err != nil {
-         return ""
-     }
+	return username
+}
 
-     return username
- }
-
- // hashSessionToken returns the SHA-256 hash of a session token.
+// hashSessionToken returns the SHA-256 hash of a session token.
 func hashSessionToken(token string) string {
 	hash := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(hash[:])
