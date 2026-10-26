@@ -663,7 +663,7 @@ func main() {
 			Expires:  expiresAt,
 			MaxAge:   24 * 60 * 60,
 			HttpOnly: true,
-			Secure:   r.TLS != nil,
+			Secure:   true,
 			SameSite: http.SameSiteLaxMode,
 		})
 
@@ -692,7 +692,7 @@ func main() {
 			Path:     "/",
 			MaxAge:   -1,
 			HttpOnly: true,
-			Secure:   r.TLS != nil,
+			Secure:   true,
 			SameSite: http.SameSiteLaxMode,
 		})
 
