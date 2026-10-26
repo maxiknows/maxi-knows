@@ -1,0 +1,52 @@
+# Navnet på workflowet i GitHub Actions
+name: Go CI
+
+# Hvornår skal workflowet køre?
+on:
+  # Når en pull request oprettes eller opdateres
+  # med main som target
+  pull_request:
+    branches: [main]
+
+  # Når der pushes til main
+  push:
+    branches: [main]
+
+# Begrænser GitHub-tokenets rettigheder
+permissions:
+  contents: read
+
+# De opgaver GitHub skal udføre
+jobs:
+  # Navnet på vores job
+  test-and-build:
+
+    # GitHub stiller en Linux-maskine til rådighed
+    runs-on: ubuntu-latest
+
+    # Standardindstillinger for run-kommandoer
+    defaults:
+      run:
+        working-directory: go
+
+    # De enkelte trin i jobbet
+    steps:
+
+      # Hent repositoryets kode
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Installer Go
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      # Kør Go-tests
+      - name: Run tests
+        run: go test ./...
+
+      # Byg Go-applikationen
+      - name: Build application
+        run: go build -o maxi-knows ./cmd/maxi-knows
