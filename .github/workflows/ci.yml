@@ -36,6 +36,8 @@ jobs:
       # Hent repositoryets kode
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+            persist-credentials: false
 
       # Installer Go
       - name: Set up Go
@@ -68,6 +70,9 @@ jobs:
       # Hent repositoryets kode
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+            persist-credentials: false
+        
 
       # Klargør Docker Buildx til at bygge Docker-images
       - name: Set up Docker Buildx
