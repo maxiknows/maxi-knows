@@ -1,3 +1,4 @@
+
 # Navnet på workflowet i GitHub Actions
 name: Go CI
 
@@ -18,7 +19,8 @@ permissions:
 
 # De opgaver GitHub skal udføre
 jobs:
-  # Navnet på vores job
+
+  # Job 1: Test og byg Go-applikationen
   test-and-build:
 
     # GitHub stiller en Linux-maskine til rådighed
@@ -35,6 +37,8 @@ jobs:
       # Hent repositoryets kode
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Installer Go
       - name: Set up Go
@@ -50,3 +54,44 @@ jobs:
       # Byg Go-applikationen
       - name: Build application
         run: go build -o maxi-knows ./cmd/maxi-knows
+
+
+  # Job 2: Byg Docker-imaget
+  docker-build:
+
+    # GitHub stiller en ny Linux-maskine til rådighed
+    runs-on: ubuntu-latest
+
+    # Docker-jobbet starter kun, hvis Go-jobbet lykkes
+    needs: test-and-build
+
+    # De enkelte trin i Docker-jobbet
+    steps:
+
+      # Hent repositoryets kode
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Klargør Docker Buildx til at bygge Docker-images
+      # Pinned til en bestemt commit for sikkerhed
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # Byg Docker-imaget ud fra vores Dockerfile
+      # Pinned til en bestemt commit for sikkerhed
+      - name: Build Docker image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          # Brug repositoryets rod som build context
+          context: .
+
+          # Dockerfile ligger i roden af repositoryet
+          file: ./Dockerfile
+
+          # Byg kun imaget, upload det ikke endnu
+          push: false
+
+          # Giv Docker-imaget et navn og tag
+          tags: maxi-knows:latest
