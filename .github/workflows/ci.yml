@@ -95,3 +95,52 @@ jobs:
 
           # Giv Docker-imaget et navn og tag
           tags: maxi-knows:latest
+
+  
+  # Job 3: Publicer Docker-imaget til GHCR
+  publish-image:
+
+    # Kør kun efter et vellykket Docker-build
+    needs: docker-build
+
+    # Publicer kun når der pushes til main, ikke ved PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # GitHub stiller en Linux-maskine til rådighed
+    runs-on: ubuntu-latest
+
+    # Giv tilladelse til at publicere Docker-images
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      # Hent repositoryets kode
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Klargør Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      # Log ind på GitHub Container Registry
+      - name: Login to GHCR
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Byg og publicer Docker-imaget
+      - name: Build and push Docker image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/maxiknows/maxi-knows:latest
+            ghcr.io/maxiknows/maxi-knows:sha-${{ github.sha }}
