@@ -4,20 +4,18 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
-	"math"
 	"net/http"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 
+	"maxi-knows/internal/geo"
 	"maxi-knows/internal/storage"
 )
 
@@ -40,51 +38,6 @@ type SearchResult struct {
 	Description string
 }
 
-// cacheEntry holds a cached upstream response and when it expires.
-type cacheEntry struct {
-	data      []byte
-	expiresAt time.Time
-}
-
-// ttlCache is a small in-memory cache with a per-cache TTL.
-type ttlCache struct {
-	mu    sync.RWMutex
-	items map[string]cacheEntry
-	ttl   time.Duration
-}
-
-func newTTLCache(ttl time.Duration) *ttlCache {
-	return &ttlCache{items: make(map[string]cacheEntry), ttl: ttl}
-}
-
-// get returns the cached value for key if it exists and hasn't expired.
-func (c *ttlCache) get(key string) ([]byte, bool) {
-	c.mu.RLock()
-	entry, found := c.items[key]
-	c.mu.RUnlock()
-
-	if !found || time.Now().After(entry.expiresAt) {
-		return nil, false
-	}
-	return entry.data, true
-}
-
-// set stores a value under key until the cache's TTL has passed.
-func (c *ttlCache) set(key string, data []byte) {
-	c.mu.Lock()
-	c.items[key] = cacheEntry{data: data, expiresAt: time.Now().Add(c.ttl)}
-	c.mu.Unlock()
-}
-
-var (
-	// Forecasts go stale quickly, place names practically never do.
-	weatherCache  = newTTLCache(15 * time.Minute)
-	locationCache = newTTLCache(24 * time.Hour)
-
-	// Shared client with a timeout, so a slow upstream can't hang requests.
-	httpClient = &http.Client{Timeout: 5 * time.Second}
-)
-
 // renderTemplate handles the shared template rendering logic.
 // It loads layout.html together with the page-specific template,
 // then renders the named "layout" template and sends it to the browser.
@@ -93,22 +46,14 @@ func renderTemplate(w http.ResponseWriter, page string, data PageData) {
 		"templates/layout.html",
 		"templates/"+page,
 	)
-
-	// Stop and return a 500 error if the templates cannot be loaded.
 	if err != nil {
 		http.Error(w, "Could not load template", http.StatusInternalServerError)
 		return
 	}
 
-	// Render the named "layout" template and send the generated HTML
-	// to the browser through the ResponseWriter.
 	err = tmpl.ExecuteTemplate(w, "layout", data)
-
-	// Return a 500 error if the template could not be rendered.
 	if err != nil {
-
 		log.Printf("Could not render template: %v", err)
-
 		http.Error(w, "Could not render template", http.StatusInternalServerError)
 	}
 }
@@ -116,11 +61,9 @@ func renderTemplate(w http.ResponseWriter, page string, data PageData) {
 // pageHandler renders a page with the current user's session data.
 func pageHandler(db *sql.DB, page string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		data := PageData{
 			Username: getLoggedInUsername(db, r),
 		}
-
 		renderTemplate(w, page, data)
 	}
 }
@@ -165,172 +108,60 @@ func searchPageHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// parseCoords reads, validates and rounds the lat/lon query parameters.
-// Rounding to 2 decimals (~1 km) keeps the caches effective: forecasts and
-// place names don't change at that scale, and visitors share cache entries
-// instead of each getting their own.
-func parseCoords(r *http.Request) (lat, lon string, ok bool) {
-	latF, latErr := strconv.ParseFloat(r.URL.Query().Get("lat"), 64)
-	lonF, lonErr := strconv.ParseFloat(r.URL.Query().Get("lon"), 64)
+// weatherHandler proxies forecast requests to Open-Meteo via the geo
+// service, which caches per rounded lat/lon.
+func weatherHandler(svc *geo.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		lat, lon, ok := geo.ParseCoords(q.Get("lat"), q.Get("lon"))
+		if !ok {
+			http.Error(w, "valid lat and lon are required", http.StatusBadRequest)
+			return
+		}
 
-	// Reject missing, non-numeric and out-of-range coordinates.
-	if latErr != nil || lonErr != nil ||
-		latF < -90 || latF > 90 ||
-		lonF < -180 || lonF > 180 {
-		return "", "", false
+		body, hit, err := svc.Weather(lat, lon)
+		if err != nil {
+			log.Printf("Weather fetch failed: %v", err)
+			http.Error(w, "Failed to fetch weather", http.StatusBadGateway)
+			return
+		}
+		writeCachedJSON(w, body, hit)
 	}
-
-	lat = fmt.Sprintf("%.2f", math.Round(latF*100)/100)
-	lon = fmt.Sprintf("%.2f", math.Round(lonF*100)/100)
-	return lat, lon, true
 }
 
-// fetchBody performs a GET request and returns the body of a 200 response.
-func fetchBody(url string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+// locationHandler reverse-geocodes lat/lon into a place name and returns
+// {"name": "Copenhagen, Denmark"}.
+func locationHandler(svc *geo.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		lat, lon, ok := geo.ParseCoords(q.Get("lat"), q.Get("lon"))
+		if !ok {
+			http.Error(w, "valid lat and lon are required", http.StatusBadRequest)
+			return
+		}
+
+		body, hit, err := svc.Location(lat, lon)
+		if errors.Is(err, geo.ErrLocationNotFound) {
+			http.Error(w, "Location not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			log.Printf("Location lookup failed: %v", err)
+			http.Error(w, "Failed to look up location", http.StatusBadGateway)
+			return
+		}
+		writeCachedJSON(w, body, hit)
 	}
-
-	// Nominatim's usage policy requires an identifying User-Agent.
-	req.Header.Set("User-Agent", "whoknows-search/1.0 (school project)")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("upstream returned status %d", resp.StatusCode)
-	}
-
-	return io.ReadAll(resp.Body)
 }
 
-// weatherHandler proxies forecast requests to Open-Meteo and caches
-// the response per rounded lat/lon, so the homepage widget doesn't
-// hit the upstream API on every page load.
-func weatherHandler(w http.ResponseWriter, r *http.Request) {
-	lat, lon, ok := parseCoords(r)
-	if !ok {
-		http.Error(w, "valid lat and lon are required", http.StatusBadRequest)
-		return
-	}
-
-	key := lat + "," + lon
-
-	if data, found := weatherCache.get(key); found {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-Cache", "HIT")
-		w.Write(data)
-		return
-	}
-
-	url := fmt.Sprintf(
-		"https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto",
-		lat, lon,
-	)
-
-	body, err := fetchBody(url)
-	if err != nil {
-		log.Printf("Weather fetch failed: %v", err)
-		http.Error(w, "Failed to fetch weather", http.StatusBadGateway)
-		return
-	}
-
-	weatherCache.set(key, body)
-
+func writeCachedJSON(w http.ResponseWriter, body []byte, hit bool) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-Cache", "MISS")
+	if hit {
+		w.Header().Set("X-Cache", "HIT")
+	} else {
+		w.Header().Set("X-Cache", "MISS")
+	}
 	w.Write(body)
-}
-
-// locationHandler reverse-geocodes lat/lon into a place name using
-// OpenStreetMap's Nominatim and returns {"name": "Copenhagen, Denmark"}.
-// Results are cached per rounded lat/lon, which also keeps us well inside
-// Nominatim's usage policy (max 1 request per second).
-func locationHandler(w http.ResponseWriter, r *http.Request) {
-	lat, lon, ok := parseCoords(r)
-	if !ok {
-		http.Error(w, "valid lat and lon are required", http.StatusBadRequest)
-		return
-	}
-
-	key := lat + "," + lon
-
-	if data, found := locationCache.get(key); found {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-Cache", "HIT")
-		w.Write(data)
-		return
-	}
-
-	// zoom=10 asks for city-level detail rather than street-level.
-	url := fmt.Sprintf(
-		"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=%s&lon=%s&zoom=10&accept-language=en",
-		lat, lon,
-	)
-
-	body, err := fetchBody(url)
-	if err != nil {
-		log.Printf("Location lookup failed: %v", err)
-		http.Error(w, "Failed to look up location", http.StatusBadGateway)
-		return
-	}
-
-	var geo struct {
-		Address struct {
-			City         string `json:"city"`
-			Town         string `json:"town"`
-			Village      string `json:"village"`
-			Municipality string `json:"municipality"`
-			County       string `json:"county"`
-			Country      string `json:"country"`
-		} `json:"address"`
-	}
-
-	if err := json.Unmarshal(body, &geo); err != nil {
-		http.Error(w, "Failed to read location response", http.StatusBadGateway)
-		return
-	}
-
-	// Nominatim uses different keys depending on the size of the place,
-	// so take the first one that is filled in.
-	name := ""
-	for _, part := range []string{
-		geo.Address.City, geo.Address.Town, geo.Address.Village,
-		geo.Address.Municipality, geo.Address.County,
-	} {
-		if part != "" {
-			name = part
-			break
-		}
-	}
-
-	if geo.Address.Country != "" {
-		if name != "" {
-			name += ", "
-		}
-		name += geo.Address.Country
-	}
-
-	if name == "" {
-		http.Error(w, "Location not found", http.StatusNotFound)
-		return
-	}
-
-	result, err := json.Marshal(map[string]string{"name": name})
-	if err != nil {
-		http.Error(w, "Failed to encode location", http.StatusInternalServerError)
-		return
-	}
-
-	locationCache.set(key, result)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-Cache", "MISS")
-	w.Write(result)
 }
 
 func main() {
@@ -339,6 +170,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	geoSvc := geo.NewService()
 
 	// HTML routes
 
@@ -355,9 +188,6 @@ func main() {
 	http.HandleFunc("GET /about", pageHandler(db, "about.html"))
 
 	// Serve files from the static folder.
-	// For example:
-	// /static/style.css -> static/style.css
-	// /static/monkgroup.png -> static/monkgroup.png
 	http.Handle(
 		"/static/",
 		http.StripPrefix("/static/", http.FileServer(http.Dir("static"))),
@@ -388,7 +218,6 @@ func main() {
 			"SELECT url, title, content FROM pages WHERE language = ? AND content LIKE ?",
 			language, "%"+q+"%",
 		)
-
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -401,7 +230,6 @@ func main() {
 			var result SearchResult
 
 			err = rows.Scan(&result.URL, &result.Title, &result.Description)
-
 			if err != nil {
 				http.Error(w, "Database error", http.StatusInternalServerError)
 				return
@@ -444,7 +272,7 @@ func main() {
 		password := r.Form.Get("password")
 		password2 := r.Form.Get("password2")
 
-		//Check if username is empty
+		// Check if username is empty
 		if username == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -456,7 +284,7 @@ func main() {
 			return
 		}
 
-		//Check if email is empty or invalid format
+		// Check if email is empty or invalid format
 		if email == "" || !strings.Contains(email, "@") {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -468,7 +296,7 @@ func main() {
 			return
 		}
 
-		//check if password is empty
+		// Check if password is empty
 		if password == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -480,7 +308,7 @@ func main() {
 			return
 		}
 
-		//check if passwords match
+		// Check if passwords match
 		if password != password2 {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -492,15 +320,15 @@ func main() {
 			return
 		}
 
-		//check if username or email already exists in db
+		// Check if username or email already exists in db
 		var existingUserID int
 
-		err = db.QueryRow(
+		err := db.QueryRow(
 			"SELECT id FROM users WHERE username = ? OR email = ?",
 			username, email,
 		).Scan(&existingUserID)
 
-		//If username or email already exists, error message 409 shows
+		// If username or email already exists, error message 409 shows
 		if err == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
@@ -522,7 +350,6 @@ func main() {
 			[]byte(password),
 			bcrypt.DefaultCost,
 		)
-
 		if err != nil {
 			http.Error(w, "Could not hash password", http.StatusInternalServerError)
 			return
@@ -533,7 +360,6 @@ func main() {
 			"INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
 			username, email, string(passwordHash),
 		)
-
 		if err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
@@ -566,7 +392,7 @@ func main() {
 		var storedUsername string
 		var storedPassword string
 
-		err = row.Scan(&userID, &storedUsername, &storedPassword)
+		err := row.Scan(&userID, &storedUsername, &storedPassword)
 
 		if err == sql.ErrNoRows {
 			w.Header().Set("Content-Type", "application/json")
@@ -610,7 +436,6 @@ func main() {
 					[]byte(password),
 					bcrypt.DefaultCost,
 				)
-
 				if err != nil {
 					http.Error(w, "Could not hash password", http.StatusInternalServerError)
 					return
@@ -621,7 +446,6 @@ func main() {
 					string(newHash),
 					userID,
 				)
-
 				if err != nil {
 					http.Error(w, "Database error", http.StatusInternalServerError)
 					return
@@ -700,10 +524,10 @@ func main() {
 	})
 
 	// GET /API/WEATHER
-	http.HandleFunc("GET /api/weather", weatherHandler)
+	http.HandleFunc("GET /api/weather", weatherHandler(geoSvc))
 
 	// GET /API/LOCATION
-	http.HandleFunc("GET /api/location", locationHandler)
+	http.HandleFunc("GET /api/location", locationHandler(geoSvc))
 
 	// Protect the application against cross-origin requests.
 	csrf := http.NewCrossOriginProtection()
