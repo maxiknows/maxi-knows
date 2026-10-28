@@ -166,6 +166,7 @@ cython_debug/
 whoknows.db
 whoknows.db-*
 schema.sql
+.db
 
 # IntelliJ
 #.idea/
