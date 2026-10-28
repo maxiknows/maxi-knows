@@ -17,6 +17,12 @@ func InitDB(db *sql.DB) error {
         language TEXT NOT NULL CHECK(language IN ('en', 'da')) DEFAULT 'en',
         last_updated TIMESTAMP,
         content TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
     );`
 
 	_, err := db.Exec(schema)
