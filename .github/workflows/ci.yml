@@ -160,13 +160,11 @@ jobs:
       - name: Build image
         run: docker build -t maxi-knows:smoke .
 
-      # The container runs as uid 10001, so the mounted folder must be writable.
       - name: Create test database
         run: |
           mkdir -p /tmp/smoke-data
           sqlite3 /tmp/smoke-data/whoknows.db < scripts/smoke-schema.sql
-          chmod 777 /tmp/smoke-data
-          chmod 666 /tmp/smoke-data/whoknows.db
+          sudo chown -R 10001:10001 /tmp/smoke-data
 
       - name: Start container
         run: docker run -d --name app -p 8080:8080 -v /tmp/smoke-data:/app/data maxi-knows:smoke

@@ -10,13 +10,13 @@ FAILS=0
 code() { curl -s -o /dev/null -m 15 -w '%{http_code}' "$@"; }
 
 check() {
-  if [ "$2" = "$3" ]; then echo "PASS $1"
+  if [[ "$2" = "$3" ]]; then echo "PASS $1"
   else echo "FAIL $1 (expected $2, got $3)"; FAILS=$((FAILS+1)); fi
 }
 
 # Upstream APIs (Open-Meteo, Nominatim) can be flaky; warn instead of failing.
 soft() {
-  if [ "$2" = "$3" ]; then echo "PASS $1"
+  if [[ "$2" = "$3" ]]; then echo "PASS $1"
   else echo "WARN $1 (expected $2, got $3)"; fi
 }
 
@@ -40,7 +40,7 @@ soft  "weather upstream"  200 "$(code "$BASE/api/weather?lat=55.68&lon=12.57")"
 soft  "location upstream" 200 "$(code "$BASE/api/location?lat=55.68&lon=12.57")"
 
 # --- auth flow (creates data) ---
-if [ "$FULL" = "1" ]; then
+if [[ "$FULL" = "1" ]]; then
   JAR=$(mktemp); OLD=$(mktemp)
   U="smoke$RANDOM"; PW="pw12345"
 
@@ -65,5 +65,5 @@ if [ "$FULL" = "1" ]; then
 fi
 
 echo
-if [ "$FAILS" -gt 0 ]; then echo "$FAILS check(s) failed"; exit 1; fi
+if [[ "$FAILS" -gt 0 ]]; then echo "$FAILS check(s) failed"; exit 1; fi
 echo "All checks passed"
