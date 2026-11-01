@@ -13,6 +13,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Show checkout
+        run: ls -l scripts/
+        
       # Hent SSH-nøglen fra GitHub Secrets
       - name: Configure SSH
         env:
