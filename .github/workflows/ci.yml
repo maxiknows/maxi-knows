@@ -101,7 +101,7 @@ jobs:
   publish-image:
 
     # Kør kun efter et vellykket Docker-build
-    needs: docker-build
+    needs: [docker-build, smoke-test]
 
     # Publicer kun når der pushes til main, ikke ved PRs
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -144,3 +144,46 @@ jobs:
           tags: |
             ghcr.io/maxiknows/maxi-knows:latest
             ghcr.io/maxiknows/maxi-knows:sha-${{ github.sha }}
+
+
+##Smoke test job
+  smoke-test:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build -t maxi-knows:smoke .
+
+      # The container runs as uid 10001, so the mounted folder must be writable.
+      - name: Create test database
+        run: |
+          mkdir -p /tmp/smoke-data
+          sqlite3 /tmp/smoke-data/whoknows.db < scripts/smoke-schema.sql
+          chmod 777 /tmp/smoke-data
+          chmod 666 /tmp/smoke-data/whoknows.db
+
+      - name: Start container
+        run: docker run -d --name app -p 8080:8080 -v /tmp/smoke-data:/app/data maxi-knows:smoke
+
+      - name: Wait for the app
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/about > /dev/null && exit 0
+            sleep 1
+          done
+          echo "App did not start"
+          docker logs app
+          exit 1
+
+      - name: Run smoke test
+        run: FULL=1 bash scripts/smoke.sh
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs app
