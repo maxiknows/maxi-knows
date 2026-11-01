@@ -244,3 +244,34 @@ Decisions, problems and thought processes from the Maxi Knows (WhoKnows) rewrite
 | 12 | Why Azure and the chosen region; why no license | Group |
 | 13 | Contributions and reasoning from Jihad (none of the source documents mention any) | Jihad |
 
+## main.go cleanup, smoke tests and container deploy (Nov 2026)
+
+### Choices
+
+**Split `main.go` into `internal/` packages** (`geo`, `auth`, `storage`, `handlers`). The file was ~500 lines mixing HTTP, SQL, caching and external API calls. `main.go` now only wires things together, handlers no longer contain SQL, and the shared-`err` data race in the handlers is gone.
+
+**Smoke test as a script (`scripts/smoke.sh`), not inline cURL.** One script runs locally, in CI and in CD, so we can debug it on a laptop instead of through GitHub Actions.
+
+**Both CI and CD smoke tests.** They catch different failures:
+- CI starts the built Docker image against a throwaway DB and runs the full flow (register, login, logout). `publish-image` only runs if it passes.
+- CD runs the script on the VM over SSH, read-only, so no test users end up in production.
+
+**Test the Docker image, not the bare binary.** Most of our deploy risk is in the image: where templates, static files and the DB resolve.
+
+**Schema created at startup (`CREATE TABLE IF NOT EXISTS sessions`).** The app should not depend on a hand-made database.
+
+### Challenges
+
+- **Login returned 500 on a fresh DB.** The session code inserted into a `sessions` table that nothing created. Found via the smoke test; the handler swallowed the real error, which cost us time.
+- **A stale server on :8080** made early smoke runs test the wrong process and possibly write test users to the real DB. Lesson: check what owns the port before trusting a green run.
+- **Relative paths** (`templates/`, `static/`, `../data/`) depend on the working directory, and the move to `cmd/maxi-knows/` made that visible.
+- **Moving the VM from a systemd binary to a container.** The old service held port 8080, and the container (uid 10001) could not write to the bind-mounted `data/` ("readonly database"). Fixed by stopping the service and `chown`ing `data/` to 10001.
+- **Sonar:** `[[` instead of `[` in bash, `chown` instead of `chmod 777`. MD5 is kept on purpose to verify legacy hashes and is upgraded to bcrypt on login.
+
+### Known gaps / next
+
+- Deploy is still manual (`docker compose pull && up -d`); the next step is an SSH deploy job before the CD smoke test.
+- The CD smoke test is read-only, so it does not cover login in production; CI does.
+- Handlers should log the underlying error before returning 500.
+- Templates are still parsed on every request.
+- Accounts with a legacy MD5 hash that never log in keep it.
