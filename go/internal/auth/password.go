@@ -23,7 +23,7 @@ func CheckPassword(stored, password string) (ok, needsUpgrade bool) {
 	}
 
 	// Legacy user: old MD5 hash.
-	sum := md5.Sum([]byte(password))
+	sum := md5.Sum([]byte(password)) // NOSONAR: legacy hash verification only, upgraded to bcrypt on login
 	legacy := hex.EncodeToString(sum[:])
 	ok = subtle.ConstantTimeCompare([]byte(stored), []byte(legacy)) == 1
 	return ok, ok
