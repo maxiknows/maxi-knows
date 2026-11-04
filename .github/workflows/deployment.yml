@@ -1,19 +1,38 @@
-
+# Navn
 name: Go CD
 
-# Kun manuel start, indtil SSH er testet
+# Workflow udløses når CI workflowet afsluttes efter push til main branch
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Go CI"]
+    types:
+      - completed
+    branches:
+      - main
 
 permissions:
   contents: read
 
+
+# Sørger for at kun én deployment kører ad gangen, og at nye deployments ikke afbryder igangværende deployments
+concurrency:
+  group: maxi-knows-production
+  cancel-in-progress: false
+
+#Jobbet der skal udføres, med betingelser for at køre
 jobs:
-  test-ssh:
+  deploy:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
+
     runs-on: ubuntu-latest
 
+    # Tager SSH-nøgler og host information fra GitHub secrets, logger ind på Azure VM'en og kører Docker Compose kommandoer for at opdatere applikationen
     steps:
-      # Hent SSH-nøglen fra GitHub Secrets
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -21,23 +40,20 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      # Log ind på VM'en og udfør en test
-      - name: Test SSH connection
+      - name: Deploy to Azure VM
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
         run: |
-          ssh \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -i ~/.ssh/deploy_key \
-            "$SSH_USER@$SSH_HOST" \
-            'echo "SSH CONNECTION SUCCESSFUL" && whoami && hostname'
+          ssh -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/deploy_key \
+              "$SSH_USER@$SSH_HOST" \
+              'cd /home/azureuser/maxi-knows &&
+               sudo -n docker compose pull &&
+               sudo -n docker compose up -d'
