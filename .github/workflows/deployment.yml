@@ -33,12 +33,18 @@ jobs:
 
     # Tager SSH-nøgler og host information fra GitHub secrets, logger ind på Azure VM'en og kører Docker Compose kommandoer for at opdatere applikationen
     steps:
+
+        
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main
           persist-credentials: false
-      
+
+      - name: Show checkout
+        run: ls -l scripts/
+
+      # Hent SSH-nøglen fra GitHub Secrets
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
