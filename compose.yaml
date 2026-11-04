@@ -1,8 +1,20 @@
 services:
   maxi-knows:
     image: ghcr.io/maxiknows/maxi-knows:latest
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     volumes:
       - ./data:/app/data:Z
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro,Z
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - maxi-knows
     restart: unless-stopped

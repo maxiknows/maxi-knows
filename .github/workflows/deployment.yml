@@ -57,6 +57,33 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+            # Copy Compose and Nginx configuration to the VM
+
+
+      - name: Copy deployment configuration
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/deploy_key \
+              "$SSH_USER@$SSH_HOST" \
+              'mkdir -p /home/azureuser/maxi-knows/nginx'
+
+          scp -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/deploy_key \
+              compose.yaml \
+              "$SSH_USER@$SSH_HOST:/home/azureuser/maxi-knows/compose.yaml"
+
+          scp -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/deploy_key \
+              nginx/nginx.conf \
+              "$SSH_USER@$SSH_HOST:/home/azureuser/maxi-knows/nginx/nginx.conf"
+
+
       - name: Deploy to Azure VM
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -72,9 +99,7 @@ jobs:
 
 
 
-      # Streams scripts/smoke.sh to the VM and runs it there (read-only mode).
-      # Waits up to a minute for the app first, which matters once a deploy
-      # step runs before this.
+      # Test the deployed application through HTTPS
       - name: Smoke test on the VM
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -86,5 +111,13 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -i ~/.ssh/deploy_key \
             "$SSH_USER@$SSH_HOST" \
-            'for i in $(seq 1 30); do curl -sf http://localhost:8080/about >/dev/null && break; sleep 2; done; BASE=http://localhost:8080 bash -s' \
+            'for i in $(seq 1 30); do
+               if curl -fsS https://maxi-knows.dk/about >/dev/null; then
+                 BASE=https://maxi-knows.dk bash -s
+                 exit $?
+               fi
+               sleep 2
+             done
+             echo "HTTPS endpoint did not become ready"
+             exit 1' \
             < scripts/smoke.sh
