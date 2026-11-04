@@ -14,6 +14,7 @@ jobs:
 
     steps:
 
+        
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -21,7 +22,7 @@ jobs:
 
       - name: Show checkout
         run: ls -l scripts/
-        
+
       # Hent SSH-nøglen fra GitHub Secrets
       - name: Configure SSH
         env:
