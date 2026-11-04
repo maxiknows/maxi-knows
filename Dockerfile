@@ -27,7 +27,11 @@ RUN go build -o maxi-knows ./cmd/maxi-knows
 #Use a small Debian image to run the compiled app:
 FROM debian:bookworm-slim
 
-#Set /app/go as the working dir:
+# Install CA certificates for HTTPS requests:
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app/go
 
 # Create a non-root user for running the application:
