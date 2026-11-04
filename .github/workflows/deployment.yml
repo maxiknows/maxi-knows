@@ -33,6 +33,12 @@ jobs:
 
     # Tager SSH-nøgler og host information fra GitHub secrets, logger ind på Azure VM'en og kører Docker Compose kommandoer for at opdatere applikationen
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -57,3 +63,22 @@ jobs:
               'cd /home/azureuser/maxi-knows &&
                sudo -n docker compose pull &&
                sudo -n docker compose up -d'
+
+
+
+      # Streams scripts/smoke.sh to the VM and runs it there (read-only mode).
+      # Waits up to a minute for the app first, which matters once a deploy
+      # step runs before this.
+      - name: Smoke test on the VM
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -i ~/.ssh/deploy_key \
+            "$SSH_USER@$SSH_HOST" \
+            'for i in $(seq 1 30); do curl -sf http://localhost:8080/about >/dev/null && break; sleep 2; done; BASE=http://localhost:8080 bash -s' \
+            < scripts/smoke.sh
