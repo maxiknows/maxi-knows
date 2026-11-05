@@ -16,6 +16,20 @@ body {
     font-size: 14px;
     color: var(--text-primary);
     background: #fff;
+
+    margin: 0;
+    min-height: 100vh;
+}
+
+/* Page layout - keep footer at the bottom */
+.page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.page .body {
+    flex: 1;
 }
 
 div.page div.body {
