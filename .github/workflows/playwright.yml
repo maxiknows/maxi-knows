@@ -38,12 +38,12 @@ jobs:
       # Install Playwright dependencies
       - name: Install npm dependencies
         working-directory: go/tests/e2e
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # Install Chromium and system dependencies
       - name: Install Chromium
         working-directory: go/tests/e2e
-        run: npx playwright install --with-deps chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
 
       # Create a temporary SQLite database
       - name: Create test database
@@ -85,7 +85,7 @@ jobs:
       # Run Playwright E2E tests
       - name: Run Playwright tests
         working-directory: go/tests/e2e
-        run: npx playwright test --project=chromium
+        run: ./node_modules/.bin/playwright test --project=chromium
 
       # Save the HTML test report
       - name: Upload Playwright report
