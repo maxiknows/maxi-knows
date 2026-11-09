@@ -167,6 +167,7 @@ whoknows.db
 whoknows.db-*
 schema.sql
 .db
+go/tests/e2e/*.db
 
 # IntelliJ
 #.idea/
@@ -177,3 +178,13 @@ schema.sql
 # backup files
 backup_files/
 *.bak
+
+# Playwright
+**/node_modules/
+**/playwright-report/
+**/test-results/
+
+# Local E2E test database
+go/tests/e2e/*.db
+go/tests/e2e/*.db-shm
+go/tests/e2e/*.db-wal
