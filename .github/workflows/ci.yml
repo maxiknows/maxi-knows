@@ -20,6 +20,26 @@ permissions:
 # De opgaver GitHub skal udføre
 jobs:
 
+  #Kontroller Dockerfile med hadolint
+  hadolint:
+    #Kør jobbet på en linux-maskine
+    runs-on: ubuntu-latest
+
+    steps:
+      #Hent repoets kode
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      #Analyser dockerfile med hadolint
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+
+
   # Job 1: Test og byg Go-applikationen
   test-and-build:
 
@@ -101,7 +121,7 @@ jobs:
   publish-image:
 
     # Kør kun efter et vellykket Docker-build
-    needs: [docker-build, smoke-test]
+    needs: [docker-build, smoke-test, hadolint]
 
     # Publicer kun når der pushes til main, ikke ved PRs
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
