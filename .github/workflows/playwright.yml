@@ -1,0 +1,103 @@
+
+name: Playwright E2E Tests
+
+# Run tests on pull requests and pushes to main
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Get repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Install Go
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      # Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: go/tests/e2e/package-lock.json
+
+      # Install Playwright dependencies
+      - name: Install npm dependencies
+        working-directory: go/tests/e2e
+        run: npm ci
+
+      # Install Chromium and system dependencies
+      - name: Install Chromium
+        working-directory: go/tests/e2e
+        run: npx playwright install --with-deps chromium
+
+      # Create a temporary SQLite database
+      - name: Create test database
+        run: |
+          python3 - <<'PY'
+          import os
+          import sqlite3
+          from pathlib import Path
+
+          schema = Path("scripts/smoke-schema.sql").read_text()
+          db_path = Path(os.environ["RUNNER_TEMP"]) / "playwright-test.db"
+
+          with sqlite3.connect(db_path) as db:
+              db.executescript(schema)
+
+          print(f"Test database created: {db_path}")
+          PY
+
+      # Start the Go application using the test database
+      - name: Start Go application
+        working-directory: go
+        run: |
+          export DB_PATH="$RUNNER_TEMP/playwright-test.db"
+
+          go run ./cmd/maxi-knows > "$RUNNER_TEMP/maxi-knows.log" 2>&1 &
+
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8080/about > /dev/null; then
+              echo "Go application is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Go application failed to start"
+          cat "$RUNNER_TEMP/maxi-knows.log"
+          exit 1
+
+      # Run Playwright E2E tests
+      - name: Run Playwright tests
+        working-directory: go/tests/e2e
+        run: npx playwright test --project=chromium
+
+      # Save the HTML test report
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: go/tests/e2e/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Show application logs if something fails
+      - name: Show Go application logs
+        if: failure()
+        run: cat "$RUNNER_TEMP/maxi-knows.log" || true
