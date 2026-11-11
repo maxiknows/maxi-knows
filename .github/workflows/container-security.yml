@@ -27,7 +27,7 @@ jobs:
         run: docker build -t maxi-knows:trivy-scan .
 
       # Scan the docker image from high and critical vulnerabilities:
-      - name: Scan Docer image with trivy
+      - name: Scan Docker image with trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
