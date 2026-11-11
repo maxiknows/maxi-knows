@@ -1,0 +1,38 @@
+# Scans the Docker image for known security vulnerabilities.
+name: Container Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Gives the workflow read-only access to repository contents.
+permissions:
+  contents: read
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Download the repository code to the GitHub runner:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Build the docker image locally on the runner:
+      - name: Build Docker image
+        run: docker build -t maxi-knows:trivy-scan .
+
+      # Scan the docker image fro high and critical vulnerabilities:
+      - name: Scan Docer image with trivy
+        uses: aquasecurity/trivy-action@ved142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: maxi-knows:trivy-scan
+          scanners: vuln
+          format: table
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
