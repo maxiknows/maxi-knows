@@ -3,11 +3,8 @@
 ## CI/CD Status
 
 [![Go CI](https://github.com/maxiknows/maxi-knows/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/ci.yml)
-
 [![Go CD](https://github.com/maxiknows/maxi-knows/actions/workflows/deployment.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/deployment.yml)
-
 [![Go Lint](https://github.com/maxiknows/maxi-knows/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/lint.yml)
-
 [![Playwright E2E Tests](https://github.com/maxiknows/maxi-knows/actions/workflows/playwright.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/playwright.yml)
 
 
