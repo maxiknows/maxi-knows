@@ -1,5 +1,16 @@
 # Maxi Knows
 
+## CI/CD Status
+
+[![Go CI](https://github.com/maxiknows/maxi-knows/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/ci.yml)
+
+[![Go CD](https://github.com/maxiknows/maxi-knows/actions/workflows/deployment.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/deployment.yml)
+
+[![Go Lint](https://github.com/maxiknows/maxi-knows/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/lint.yml)
+
+[![Playwright E2E Tests](https://github.com/maxiknows/maxi-knows/actions/workflows/playwright.yml/badge.svg?branch=main)](https://github.com/maxiknows/maxi-knows/actions/workflows/playwright.yml)
+
+
 Maxi Knows is a DevOps project developed as part of the Datamatiker education at KEA.
 
 The project is based on a legacy version of the WhoKnows application and focuses on modernising, securing and deploying an existing application rather than building a new system from scratch.
