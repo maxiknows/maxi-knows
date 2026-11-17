@@ -11,6 +11,7 @@ import (
 
 	"maxi-knows/internal/geo"
 	"maxi-knows/internal/handlers"
+	"maxi-knows/internal/storage"
 )
 
 const defaultDBPath = "../data/whoknows.db"
@@ -33,6 +34,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize database and run migrations before starting the server.
+	if err := storage.InitDB(db); err != nil {
+		log.Fatalf("could not initialize database: %v", err)
+	}
+
 	// Older databases were created without this table, which made login
 	// return 500. IF NOT EXISTS makes it a no-op where it already exists.
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS sessions (
@@ -47,7 +53,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           http.NewCrossOriginProtection().Handler(http.DefaultServeMux),
+		Handler:           http.NewCrossOriginProtection().Handler(handlers.PasswordResetGate(db, http.DefaultServeMux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

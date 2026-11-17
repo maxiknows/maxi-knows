@@ -26,5 +26,9 @@ func InitDB(db *sql.DB) error {
     );`
 
 	_, err := db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return MigratePasswordReset(db)
 }

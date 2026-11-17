@@ -14,6 +14,10 @@ func RegisterRoutes(db *sql.DB, geoSvc *geo.Service) {
 	http.HandleFunc("GET /login", PageHandler(db, "login.html"))
 	http.HandleFunc("GET /about", PageHandler(db, "about.html"))
 
+	// Password change page for security breaches
+	http.HandleFunc("GET /change-password", PageHandler(db, "change-password.html"))
+	http.HandleFunc("POST /api/change-password", ChangePasswordHandler(db))
+
 	// Static files
 	http.Handle(
 		"/static/",
