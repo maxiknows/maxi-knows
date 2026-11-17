@@ -160,6 +160,11 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 			SameSite: http.SameSiteLaxMode,
 		})
 
+		if user.MustChangePassword {
+			http.Redirect(w, r, "/change-password", http.StatusSeeOther)
+			return
+		}
+
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }

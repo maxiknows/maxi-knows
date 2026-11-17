@@ -12,18 +12,19 @@ var (
 )
 
 type User struct {
-	ID           int
-	Username     string
-	PasswordHash string
+	ID                 int
+	Username           string
+	PasswordHash       string
+	MustChangePassword bool
 }
 
 // GetUserByUsername returns ErrUserNotFound if no such user exists.
 func GetUserByUsername(db *sql.DB, username string) (User, error) {
 	var u User
 	err := db.QueryRow(
-		"SELECT id, username, password FROM users WHERE username = ?",
+		"SELECT id, username, password, must_change_password FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.MustChangePassword)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrUserNotFound
