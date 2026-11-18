@@ -1,11 +1,10 @@
-
 package storage
 
 import (
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
-	"errors"
 
 	_ "modernc.org/sqlite"
 )
@@ -57,7 +56,6 @@ func TestCreateAndGetUser(t *testing.T) {
 	}
 }
 
-
 func TestCreateDuplicateUser(t *testing.T) {
 	db := setupTestDB(t)
 
@@ -76,7 +74,6 @@ func TestCreateDuplicateUser(t *testing.T) {
 	}
 }
 
-
 func TestCreateDuplicateEmail(t *testing.T) {
 	db := setupTestDB(t)
 
@@ -94,8 +91,6 @@ func TestCreateDuplicateEmail(t *testing.T) {
 		t.Errorf("Expected ErrUserExists, got %v", err)
 	}
 }
-
-
 
 func TestGetUserNotFound(t *testing.T) {
 	db := setupTestDB(t)
