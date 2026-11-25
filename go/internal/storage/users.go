@@ -69,3 +69,14 @@ func UpdatePassword(db *sql.DB, userID int, passwordHash string) error {
 	)
 	return err
 }
+
+// CountUsers returns the total number of registered users.
+func CountUsers(db *sql.DB) (int, error) {
+    var count int
+
+    err := db.QueryRow(
+        "SELECT COUNT(*) FROM users",
+    ).Scan(&count)
+
+    return count, err
+}
