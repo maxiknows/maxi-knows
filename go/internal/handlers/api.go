@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"maxi-knows/internal/monitoring"
 )
@@ -27,11 +26,6 @@ func SearchAPIHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		monitoring.SearchRequests.WithLabelValues("api").Inc()
-
-		start := time.Now()
-		defer func() {
-			monitoring.SearchDuration.WithLabelValues("api").Observe(time.Since(start).Seconds())
-		}()
 
 		rows, err := db.Query(
 			"SELECT url, title, content FROM pages WHERE language = ? AND content LIKE ?",

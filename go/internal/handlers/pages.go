@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"time"
 
 	"maxi-knows/internal/auth"
 	"maxi-knows/internal/monitoring"
@@ -66,11 +65,6 @@ func SearchPageHandler(db *sql.DB) http.HandlerFunc {
 
 		if query != "" {
 			monitoring.SearchRequests.WithLabelValues("web").Inc()
-
-			start := time.Now()
-			defer func() {
-				monitoring.SearchDuration.WithLabelValues("web").Observe(time.Since(start).Seconds())
-			}()
 
 			pages, err := storage.SearchPagesQuery(db, query, "en")
 			if err != nil {

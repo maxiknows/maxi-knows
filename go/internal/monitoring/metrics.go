@@ -29,16 +29,6 @@ var SearchZeroResults = prometheus.NewCounterVec(
 	[]string{"source"},
 )
 
-// SearchDuration measures search request duration in seconds.
-var SearchDuration = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "maxiknows_search_duration_seconds",
-		Help:    "Duration of search requests in seconds.",
-		Buckets: prometheus.DefBuckets,
-	},
-	[]string{"source"},
-)
-
 // RegisteredUsers measures the current number of registered users.
 var RegisteredUsers = prometheus.NewGauge(
 	prometheus.GaugeOpts{
@@ -55,12 +45,30 @@ var UsersWithValidSessions = prometheus.NewGauge(
 	},
 )
 
+// HTTPResponses counts HTTP responses sent by the application.
+var HTTPResponses = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: "maxiknows_http_responses_total",
+		Help: "Total number of HTTP responses sent.",
+	},
+)
+
+// RequestDuration measures HTTP request duration in seconds.
+var RequestDuration = prometheus.NewHistogram(
+	prometheus.HistogramOpts{
+		Name:    "maxiknows_request_duration_seconds",
+		Help:    "Duration of HTTP requests in seconds.",
+		Buckets: prometheus.DefBuckets,
+	},
+)
+
 func init() {
 	prometheus.MustRegister(SearchRequests)
 	prometheus.MustRegister(SearchZeroResults)
-	prometheus.MustRegister(SearchDuration)
 	prometheus.MustRegister(RegisteredUsers)
 	prometheus.MustRegister(UsersWithValidSessions)
+	prometheus.MustRegister(HTTPResponses)
+	prometheus.MustRegister(RequestDuration)
 }
 
 // UpdateUserMetrics updates user metrics using the database.
