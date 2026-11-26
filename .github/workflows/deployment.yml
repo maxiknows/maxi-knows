@@ -69,7 +69,7 @@ jobs:
               -o StrictHostKeyChecking=yes \
               -i ~/.ssh/deploy_key \
               "$SSH_USER@$SSH_HOST" \
-              'mkdir -p /home/azureuser/maxi-knows/nginx'
+              'mkdir -p /home/azureuser/maxi-knows/nginx /home/azureuser/maxi-knows/grafana'
 
           scp -o BatchMode=yes \
               -o StrictHostKeyChecking=yes \
@@ -82,6 +82,18 @@ jobs:
               -i ~/.ssh/deploy_key \
               nginx/nginx.conf \
               "$SSH_USER@$SSH_HOST:/home/azureuser/maxi-knows/nginx/nginx.conf"
+
+          scp -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/deploy_key \
+              prometheus.yml \
+              "$SSH_USER@$SSH_HOST:/home/azureuser/maxi-knows/prometheus.yml"
+
+          scp -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -i ~/.ssh/deploy_key \
+              grafana/dashboard.json \
+              "$SSH_USER@$SSH_HOST:/home/azureuser/maxi-knows/grafana/dashboard.json"
 
 
       - name: Deploy to Azure VM
