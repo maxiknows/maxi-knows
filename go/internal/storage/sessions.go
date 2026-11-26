@@ -48,12 +48,12 @@ func DeleteSession(db *sql.DB, tokenHash string) error {
 // CountUsersWithValidSessions returns the number of distinct users
 // with at least one non-expired session.
 func CountUsersWithValidSessions(db *sql.DB) (int, error) {
-    var count int
+	var count int
 
-    err := db.QueryRow(
-        "SELECT COUNT(DISTINCT user_id) FROM sessions WHERE expires_at > ?",
-        time.Now().Unix(),
-    ).Scan(&count)
+	err := db.QueryRow(
+		"SELECT COUNT(DISTINCT user_id) FROM sessions WHERE expires_at > ?",
+		time.Now().Unix(),
+	).Scan(&count)
 
-    return count, err
+	return count, err
 }

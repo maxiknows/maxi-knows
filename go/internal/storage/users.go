@@ -72,11 +72,11 @@ func UpdatePassword(db *sql.DB, userID int, passwordHash string) error {
 
 // CountUsers returns the total number of registered users.
 func CountUsers(db *sql.DB) (int, error) {
-    var count int
+	var count int
 
-    err := db.QueryRow(
-        "SELECT COUNT(*) FROM users",
-    ).Scan(&count)
+	err := db.QueryRow(
+		"SELECT COUNT(*) FROM users",
+	).Scan(&count)
 
-    return count, err
+	return count, err
 }
