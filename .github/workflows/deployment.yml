@@ -100,14 +100,18 @@ jobs:
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
         run: |
+          printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$GRAFANA_ADMIN_PASSWORD" | \
           ssh -o BatchMode=yes \
               -o StrictHostKeyChecking=yes \
               -i ~/.ssh/deploy_key \
               "$SSH_USER@$SSH_HOST" \
               'cd /home/azureuser/maxi-knows &&
-               sudo -n docker compose pull &&
-               sudo -n docker compose up -d'
+               umask 077 &&
+               cat > .env.grafana &&
+               sudo -n docker compose --env-file .env.grafana pull &&
+               sudo -n docker compose --env-file .env.grafana up -d'
 
 
 

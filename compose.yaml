@@ -32,6 +32,7 @@ services:
     environment:
       GF_SERVER_ROOT_URL: https://maxi-knows.dk/grafana/
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set password}
     volumes:
       - grafana_data:/var/lib/grafana
     restart: unless-stopped
