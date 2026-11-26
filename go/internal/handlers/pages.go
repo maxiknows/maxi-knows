@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"maxi-knows/internal/auth"
+	"maxi-knows/internal/monitoring"
 	"maxi-knows/internal/storage"
 )
 
@@ -63,11 +64,17 @@ func SearchPageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if query != "" {
+			monitoring.SearchRequests.WithLabelValues("web").Inc()
+
 			pages, err := storage.SearchPagesQuery(db, query, "en")
 			if err != nil {
 				log.Printf("Search failed: %v", err)
 				http.Error(w, "Database error", http.StatusInternalServerError)
 				return
+			}
+
+			if len(pages) == 0 {
+				monitoring.SearchZeroResults.WithLabelValues("web").Inc()
 			}
 
 			for _, page := range pages {

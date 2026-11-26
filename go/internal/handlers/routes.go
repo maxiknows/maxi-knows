@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"maxi-knows/internal/geo"
+	"maxi-knows/internal/monitoring"
 )
 
 func RegisterRoutes(db *sql.DB, geoSvc *geo.Service) {
@@ -35,4 +36,8 @@ func RegisterRoutes(db *sql.DB, geoSvc *geo.Service) {
 	// Geolocation API
 	http.HandleFunc("GET /api/weather", WeatherHandler(geoSvc))
 	http.HandleFunc("GET /api/location", LocationHandler(geoSvc))
+
+	// Monitoring endpoint
+	http.HandleFunc("GET /metrics", monitoring.MetricsHandler(db))
+
 }

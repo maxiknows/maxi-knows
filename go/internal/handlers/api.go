@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+
+	"maxi-knows/internal/monitoring"
 )
 
 func SearchAPIHandler(db *sql.DB) http.HandlerFunc {
@@ -22,6 +24,8 @@ func SearchAPIHandler(db *sql.DB) http.HandlerFunc {
 		if language == "" {
 			language = "en"
 		}
+
+		monitoring.SearchRequests.WithLabelValues("api").Inc()
 
 		rows, err := db.Query(
 			"SELECT url, title, content FROM pages WHERE language = ? AND content LIKE ?",
@@ -51,6 +55,10 @@ func SearchAPIHandler(db *sql.DB) http.HandlerFunc {
 		if err := rows.Err(); err != nil {
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
+		}
+
+		if len(results) == 0 {
+			monitoring.SearchZeroResults.WithLabelValues("api").Inc()
 		}
 
 		writeJSON(w, http.StatusOK, map[string]interface{}{

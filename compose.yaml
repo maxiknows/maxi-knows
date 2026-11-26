@@ -17,4 +17,26 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - maxi-knows
+      - grafana
     restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.3.2
+    environment:
+      GF_SERVER_ROOT_URL: https://maxi-knows.dk/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set password}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

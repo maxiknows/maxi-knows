@@ -11,6 +11,7 @@ import (
 
 	"maxi-knows/internal/geo"
 	"maxi-knows/internal/handlers"
+	"maxi-knows/internal/monitoring"
 	"maxi-knows/internal/storage"
 )
 
@@ -53,7 +54,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":8080",
-		Handler:           http.NewCrossOriginProtection().Handler(handlers.PasswordResetGate(db, http.DefaultServeMux)),
+		Handler:           monitoring.Middleware(http.NewCrossOriginProtection().Handler(handlers.PasswordResetGate(db, http.DefaultServeMux))),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
